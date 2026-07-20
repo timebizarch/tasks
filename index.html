@@ -253,8 +253,10 @@ function smartParse(raw) {
     });
   } else {
     if (/\burgente\b/i.test(stripAccents(text))) { urgent = true; text = text.replace(/\burgente\b/gi, ""); }
-    const m = text.match(/\bat[ée]\s+([^,;.]+)/i) || text.match(/\b(hoje|amanh[ãa])\b/i);
-    if (m) { const d = parseDuePhrase(m[1] || m[0]); if (d) { due_date = d; text = text.replace(m[0], ""); } }
+    // Só reconhece "até <palavra de data>" — não engole o resto da frase depois do prazo.
+    const DATE_WORD = "(?:hoje|amanh[ãa]|domingo|segunda(?:-feira)?|ter[çc]a(?:-feira)?|quarta(?:-feira)?|quinta(?:-feira)?|sexta(?:-feira)?|s[áa]bado|\\d{1,2}\\/\\d{1,2}(?:\\/\\d{2,4})?)";
+    const m = text.match(new RegExp("\\bat[ée]\\s+" + DATE_WORD + "\\b", "i")) || text.match(/\b(hoje|amanh[ãa])\b/i);
+    if (m) { const d = parseDuePhrase(m[0]); if (d) { due_date = d; text = text.replace(m[0], ""); } }
     text = text.replace(/\s*,\s*,/g, ",").replace(/,\s*$/, "").replace(/^\s*,\s*/, "").replace(/\s{2,}/g, " ").trim();
   }
   return { text: text || raw.trim(), area, urgent, due_date };
@@ -274,6 +276,8 @@ let sb = null, tasks = [], userEmail = "";
 const COL_LIMIT = 6;
 let expandedCols = {};
 let filters = { urgent: false, area: "" };
+let refocusCapture = false;
+let capturing = false;
 
 function boot() {
   if (SUPABASE_URL.startsWith("COLE_") || SUPABASE_ANON_KEY.startsWith("COLE_")) {
@@ -283,9 +287,16 @@ function boot() {
     return;
   }
   sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  let hasLoadedOnce = false;
   sb.auth.onAuthStateChange((_e, session) => {
-    if (session && session.user) { userEmail = session.user.email; loadAndRender(); }
-    else renderAuth();
+    if (session && session.user) {
+      userEmail = session.user.email;
+      loadAndRender(hasLoadedOnce); // após o 1º carregamento, renovações de token não piscam a tela
+      hasLoadedOnce = true;
+    } else {
+      hasLoadedOnce = false;
+      renderAuth();
+    }
   });
 }
 
@@ -340,6 +351,10 @@ function doAuth(signup) {
 async function signOut() { await sb.auth.signOut(); }
 
 /* ---------- DADOS ---------- */
+function reportError(action, error) {
+  console.error(action, error);
+  alert("Não deu pra " + action + ": " + (error && error.message ? error.message : "erro desconhecido"));
+}
 async function loadAndRender(quiet) {
   if (!quiet) root.innerHTML = '<div class="loading">Carregando suas tarefas…</div>';
   const { data, error } = await sb.from("tasks").select("*").order("created_at", { ascending: true });
@@ -353,35 +368,43 @@ async function addTask(raw) {
     text: p.text, bucket: "inbox", done: false,
     area: p.area, urgent: p.urgent, due_date: p.due_date,
   });
-  if (!error) loadAndRender(true);
+  if (error) { reportError("capturar a tarefa", error); return; }
+  loadAndRender(true);
 }
 async function moveTask(id, to) {
   const { error } = await sb.from("tasks").update({ bucket: to, done: false }).eq("id", id);
-  if (!error) loadAndRender(true);
+  if (error) { reportError("mover a tarefa", error); return; }
+  loadAndRender(true);
 }
 async function toggleTask(id, done) {
   const { error } = await sb.from("tasks").update({ done }).eq("id", id);
-  if (!error) loadAndRender(true);
+  if (error) { reportError("marcar a tarefa", error); return; }
+  loadAndRender(true);
 }
 async function delTask(id) {
   const { error } = await sb.from("tasks").delete().eq("id", id);
-  if (!error) loadAndRender(true);
+  if (error) { reportError("remover a tarefa", error); return; }
+  loadAndRender(true);
 }
 async function clearDone(bucket) {
   const { error } = await sb.from("tasks").delete().eq("bucket", bucket).eq("done", true);
-  if (!error) loadAndRender(true);
+  if (error) { reportError("limpar as concluídas", error); return; }
+  loadAndRender(true);
 }
 async function updateArea(id, area) {
   const { error } = await sb.from("tasks").update({ area: area || null }).eq("id", id);
-  if (!error) loadAndRender(true);
+  if (error) { reportError("salvar a área", error); return; }
+  loadAndRender(true);
 }
 async function updateDue(id, due) {
   const { error } = await sb.from("tasks").update({ due_date: due || null }).eq("id", id);
-  if (!error) loadAndRender(true);
+  if (error) { reportError("salvar o prazo", error); return; }
+  loadAndRender(true);
 }
 async function toggleUrgent(id, current) {
   const { error } = await sb.from("tasks").update({ urgent: !current }).eq("id", id);
-  if (!error) loadAndRender(true);
+  if (error) { reportError("marcar como urgente", error); return; }
+  loadAndRender(true);
 }
 
 /* ---------- APP ---------- */
@@ -466,9 +489,23 @@ function renderApp() {
   root.innerHTML = html;
 
   document.getElementById("out").onclick = signOut;
-  const cap = () => { const el = document.getElementById("capInput"); const v = el.value.trim(); if (v) { addTask(v); el.value = ""; } };
+  const cap = async () => {
+    const el = document.getElementById("capInput");
+    const v = el.value.trim();
+    if (!v || capturing) return;
+    capturing = true;
+    refocusCapture = true;
+    el.value = "";
+    try { await addTask(v); } finally { capturing = false; }
+  };
   document.getElementById("capBtn").onclick = cap;
   document.getElementById("capInput").addEventListener("keydown", (e) => { if (e.key === "Enter") cap(); });
+
+  if (refocusCapture) {
+    refocusCapture = false;
+    const ci = document.getElementById("capInput");
+    if (ci) ci.focus();
+  }
 }
 
 /* Anexados uma única vez em #root (que nunca é recriado) — evita acumular
