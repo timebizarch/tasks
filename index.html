@@ -96,6 +96,8 @@
   .task.open .move { display: flex; }
   .move-chips { display: flex; gap: 5px; flex-wrap: wrap; }
   .empty-note { color: var(--muted-2); font-size: 12.5px; font-style: italic; padding: 4px 0; }
+  .chev { flex: none; color: var(--muted-2); cursor: pointer; display: inline-flex; transition: transform 150ms; margin-top: 2px; }
+  .task.open .chev { transform: rotate(180deg); }
 
   .tag-urgent { color: var(--error); margin-right: 3px; }
   .tag-area, .tag-due { font-size: 11px; padding: 2px 8px; border-radius: var(--radius-pill); margin-left: 6px; background: var(--later-bg); color: var(--muted); white-space: nowrap; }
@@ -104,7 +106,8 @@
 
   .meta-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
   .meta-row input { font-size: 12.5px; padding: 6px 9px; border: 1px solid var(--line); border-radius: var(--radius-sm); font-family: var(--font-body); background: var(--card); color: var(--ink); outline: none; }
-  .meta-row input[data-area] { width: 120px; }
+  .meta-row input[data-area], .meta-row input[data-waiting] { width: 120px; }
+  .meta-row input.meta-text { flex: 1 1 100%; }
   .meta-row input:focus { border-color: var(--accent); box-shadow: var(--shadow-focus); }
   .meta-urgent-btn { font-size: 12px; border: 1px solid var(--line); background: var(--card); border-radius: var(--radius-pill); padding: 5px 11px; cursor: pointer; font-family: var(--font-body); color: var(--muted); }
   .meta-urgent-btn.on { background: var(--error-bg); border-color: var(--error); color: var(--error); font-weight: 700; }
@@ -194,6 +197,7 @@ const ICON_D = {
   close: 'M18 6L6 18M6 6l12 12',
   plus: 'M12 5v14M5 12h14',
   flame: 'M12 2c1 3-1.5 4.5-3 7-1 1.7-1.5 3-1.5 4.5a4.5 4.5 0 0 0 9 0c0-1.8-.7-3-1.8-4.3.1 1.6-.6 2.5-1.5 2.5-1.2 0-1.7-1-1.2-2.2C13 7.5 12.5 4.5 12 2z',
+  chevron: 'M6 9l6 6 6-6',
 };
 const ICON_EXTRA = {
   wait: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>',
@@ -220,7 +224,7 @@ function fmtDue(iso) { const [, m, d] = iso.split("-"); return d + "/" + m; }
    "texto | área | até terça"  ->  área + prazo já preenchidos
    "texto, urgente, até terça" (sem |) -> detecta "urgente" e "até <dia/data>" na frase */
 const WEEKDAY_MAP = { domingo: 0, segunda: 1, terca: 2, quarta: 3, quinta: 4, sexta: 5, sabado: 6 };
-function stripAccents(s) { return s.normalize("NFD").replace(/[̀-ͯ]/g, ""); }
+function stripAccents(s) { return s.normalize("NFD").replace(new RegExp("[\\u0300-\\u036f]", "g"), ""); }
 function nextDateForWeekday(dow) {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const diff = (dow - today.getDay() + 7) % 7;
@@ -275,7 +279,7 @@ const esc = (s) => (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&l
 let sb = null, tasks = [], userEmail = "";
 const COL_LIMIT = 6;
 let expandedCols = {};
-let filters = { urgent: false, area: "" };
+let filters = { urgent: false, overdue: false, area: "" };
 let refocusCapture = false;
 let capturing = false;
 
@@ -320,6 +324,7 @@ function renderAuth(mode) {
         '<button class="primary" id="go">' + (signup ? "Criar acesso" : "Entrar") + "</button>" +
         '<div class="msg" id="msg"></div>' +
         '<button class="link" id="swap">' + (signup ? "Já tenho acesso — entrar" : "Primeira vez? Criar acesso") + "</button>" +
+        (signup ? "" : '<button class="link" id="forgot">Esqueci minha senha</button>') +
       '</div></div>' +
     '</div>';
 
@@ -328,6 +333,16 @@ function renderAuth(mode) {
   ["email", "pass"].forEach((id) =>
     document.getElementById(id).addEventListener("keydown", (e) => { if (e.key === "Enter") doAuth(signup)(); })
   );
+  if (!signup) document.getElementById("forgot").onclick = doForgotPassword;
+}
+async function doForgotPassword() {
+  const email = document.getElementById("email").value.trim();
+  const msg = document.getElementById("msg");
+  if (!email) { msg.className = "msg err"; msg.textContent = "Digita seu e-mail acima primeiro."; return; }
+  msg.className = "msg"; msg.textContent = "…";
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
+  if (error) { msg.className = "msg err"; msg.textContent = error.message || "Não deu certo, tente de novo."; return; }
+  msg.className = "msg ok"; msg.textContent = "Te mandamos um e-mail com o link pra trocar a senha.";
 }
 function doAuth(signup) {
   return async () => {
@@ -396,6 +411,18 @@ async function updateArea(id, area) {
   if (error) { reportError("salvar a área", error); return; }
   loadAndRender(true);
 }
+async function updateText(id, text) {
+  const t = text.trim();
+  if (!t) return; // não deixa o texto ficar vazio
+  const { error } = await sb.from("tasks").update({ text: t }).eq("id", id);
+  if (error) { reportError("editar o texto", error); return; }
+  loadAndRender(true);
+}
+async function updateWaitingOn(id, val) {
+  const { error } = await sb.from("tasks").update({ waiting_on: val || null }).eq("id", id);
+  if (error) { reportError("salvar quem você está aguardando", error); return; }
+  loadAndRender(true);
+}
 async function updateDue(id, due) {
   const { error } = await sb.from("tasks").update({ due_date: due || null }).eq("id", id);
   if (error) { reportError("salvar o prazo", error); return; }
@@ -408,9 +435,20 @@ async function toggleUrgent(id, current) {
 }
 
 /* ---------- APP ---------- */
+function distinctAreas(list) {
+  const seen = new Map();
+  list.forEach((t) => {
+    if (!t.area) return;
+    const key = t.area.trim().toLowerCase();
+    if (key && !seen.has(key)) seen.set(key, t.area.trim());
+  });
+  return Array.from(seen.values());
+}
+function sameArea(a, b) { return !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase(); }
+
 function renderApp() {
   const inbox = tasks.filter((t) => t.bucket === "inbox");
-  const areas = Array.from(new Set(tasks.map((t) => t.area).filter(Boolean)));
+  const areas = distinctAreas(tasks);
   let html = '<datalist id="areaList">' + areas.map((a) => '<option value="' + esc(a) + '">').join("") + '</datalist>' +
     '<header class="top"><h1>' + LOGO + 'Meu dia <span>· organizador</span></h1>' +
     '<div class="who">' + esc(userEmail) + '<button id="out">sair</button></div></header>' +
@@ -428,11 +466,12 @@ function renderApp() {
   });
   html += "</div>";
 
-  const filterOn = filters.urgent || filters.area;
+  const filterOn = filters.urgent || filters.overdue || filters.area;
   html += '<div class="filters">';
   html += '<button class="fchip' + (filters.urgent ? " on" : "") + '" data-ffilter="urgent">' + icon('flame', 13) + ' Urgentes</button>';
-  html += '<select data-farea><option value="">Todas as áreas</option>';
-  areas.forEach((a) => { html += '<option value="' + esc(a) + '"' + (filters.area === a ? " selected" : "") + '>' + esc(a) + "</option>"; });
+  html += '<button class="fchip' + (filters.overdue ? " on" : "") + '" data-ffilter="overdue">' + icon('week', 13) + ' Atrasadas</button>';
+  html += '<select data-farea><option value="">Todas as áreas</option><option value="__none__"' + (filters.area === "__none__" ? " selected" : "") + '>Sem área</option>';
+  areas.forEach((a) => { html += '<option value="' + esc(a) + '"' + (sameArea(filters.area, a) ? " selected" : "") + '>' + esc(a) + "</option>"; });
   html += "</select>";
   if (filterOn) html += '<button class="fclear" data-fclear>limpar filtro</button>';
   html += "</div>";
@@ -443,7 +482,9 @@ function renderApp() {
     const active = items.filter((t) => !t.done).length;
     const hasDone = items.some((t) => t.done);
     if (filters.urgent) items = items.filter((t) => t.urgent);
-    if (filters.area) items = items.filter((t) => t.area === filters.area);
+    if (filters.overdue) items = items.filter((t) => !t.done && t.due_date && dueStatus(t.due_date) === "overdue");
+    if (filters.area === "__none__") items = items.filter((t) => !t.area);
+    else if (filters.area) items = items.filter((t) => sameArea(t.area, filters.area));
     items = items.slice().sort(cmpTask);
     const expanded = !!expandedCols[b.id];
     const visible = expanded ? items : items.slice(0, COL_LIMIT);
@@ -462,14 +503,18 @@ function renderApp() {
       html += esc(t.text);
       if (t.area) html += '<span class="tag-area">' + esc(t.area) + '</span>';
       if (t.due_date) html += '<span class="tag-due' + (due ? " tag-due-" + due : "") + '">' + fmtDue(t.due_date) + '</span>';
+      if (t.waiting_on) html += '<span class="tag-area">⏳ ' + esc(t.waiting_on) + '</span>';
       html += "</span>";
+      html += '<span class="chev" data-open="' + t.id + '">' + icon('chevron', 14) + '</span>';
       html += '<button class="x" data-del="' + t.id + '" title="remover">' + icon('close', 13) + '</button></div><div class="move">';
       html += '<div class="move-chips">';
       CHIPS.filter((c) => c.b !== b.id).forEach((c) => { html += '<button class="chip ' + c.cls + '" data-move="' + t.id + '" data-to="' + c.b + '">→ ' + c.label + "</button>"; });
       html += '</div><div class="meta-row">';
+      html += '<input type="text" class="meta-text" data-text="' + t.id + '" value="' + esc(t.text) + '" placeholder="texto da tarefa" />';
       html += '<input type="text" data-area="' + t.id + '" list="areaList" placeholder="área" value="' + esc(t.area || "") + '" />';
       html += '<input type="date" data-due="' + t.id + '" value="' + (t.due_date || "") + '" />';
       html += '<button class="meta-urgent-btn' + (t.urgent ? " on" : "") + '" data-urgent="' + t.id + '">' + icon('flame', 13) + ' urgente</button>';
+      if (b.id === "aguardando") html += '<input type="text" data-waiting="' + t.id + '" placeholder="aguardando quem?" value="' + esc(t.waiting_on || "") + '" />';
       html += "</div></div></div>";
     });
     if (hidden > 0) html += '<button class="clearbtn" data-more="' + b.id + '">ver mais (' + hidden + ')</button>';
@@ -521,13 +566,17 @@ root.addEventListener("click", (e) => {
   const ffilterBtn = e.target.closest("[data-ffilter]");
   const fclearBtn = e.target.closest("[data-fclear]");
   if (moveBtn) moveTask(moveBtn.dataset.move, moveBtn.dataset.to);
-  else if (delBtn) delTask(delBtn.dataset.del);
-  else if (clearBtn) clearDone(clearBtn.dataset.clear);
+  else if (delBtn) {
+    const id = delBtn.dataset.del;
+    const t = tasks.find((x) => x.id === id);
+    if (confirm('Remover "' + (t ? t.text : "essa tarefa") + '"?')) delTask(id);
+  }
+  else if (clearBtn) { if (confirm("Apagar as tarefas concluídas dessa coluna?")) clearDone(clearBtn.dataset.clear); }
   else if (urgentBtn) { const id = urgentBtn.dataset.urgent; const t = tasks.find((x) => x.id === id); toggleUrgent(id, t && t.urgent); }
   else if (moreBtn) { expandedCols[moreBtn.dataset.more] = true; renderApp(); }
   else if (lessBtn) { delete expandedCols[lessBtn.dataset.less]; renderApp(); }
-  else if (ffilterBtn) { filters.urgent = !filters.urgent; renderApp(); }
-  else if (fclearBtn) { filters = { urgent: false, area: "" }; renderApp(); }
+  else if (ffilterBtn) { const k = ffilterBtn.dataset.ffilter; filters[k] = !filters[k]; renderApp(); }
+  else if (fclearBtn) { filters = { urgent: false, overdue: false, area: "" }; renderApp(); }
   else if (openEl) { const el = root.querySelector('.task[data-id="' + openEl.dataset.open + '"]'); if (el) el.classList.toggle("open"); }
 });
 root.addEventListener("change", (e) => {
@@ -537,6 +586,8 @@ root.addEventListener("change", (e) => {
 });
 root.addEventListener("focusout", (e) => {
   if (e.target.dataset.area) updateArea(e.target.dataset.area, e.target.value.trim());
+  else if (e.target.dataset.text) updateText(e.target.dataset.text, e.target.value);
+  else if (e.target.dataset.waiting) updateWaitingOn(e.target.dataset.waiting, e.target.value.trim());
 });
 
 boot();

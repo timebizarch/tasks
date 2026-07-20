@@ -23,3 +23,6 @@ create policy "cada um vê e mexe só nas suas tarefas"
 alter table tasks add column if not exists area text;
 alter table tasks add column if not exists urgent boolean not null default false;
 alter table tasks add column if not exists due_date date;
+
+-- v2.2: campo "aguardando quem" (só usado no balde Aguardando).
+alter table tasks add column if not exists waiting_on text;
