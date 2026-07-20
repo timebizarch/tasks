@@ -1,0 +1,66 @@
+# Organizador de tarefas pessoal (método dos 4 baldes)
+
+App web pessoal de organização de tarefas, single-page, deploy no Netlify e persistência no Supabase com login. Uso individual da Giovanna.
+
+## Por que existe
+
+O problema real: alto volume de demandas chegando por vários canais (Slack, WhatsApp, pedidos de liderança), tudo misturado, sem captura confiável e sem priorização. Hoje ela anota tudo em notas soltas no computador e perde o fio.
+
+O app materializa um método específico. **Não mude a lógica dos baldes nem os rituais sem necessidade — eles são a solução, a UI é só o meio.**
+
+## O método (regra de negócio)
+
+Separar três coisas que hoje se misturam: capturar, priorizar, executar.
+
+- **Caixa de captura**: entrada única. Tudo que chega vai pra cá na hora, sem julgar. Bucket `inbox`.
+- **4 baldes** (bucket):
+  - `hoje` — no máximo 3 tarefas-chave (MITs). A UI mostra contador `x/3` e alerta quando passa de 3.
+  - `semana` — tarefas complexas de horizonte semanal.
+  - `aguardando` — o que depende de outra pessoa (ela coordena com muita gente; evita cobrança perdida).
+  - `depois` — não é agora, mas não perder.
+- **Tarefa complexa** nunca fica solta: fica em `semana` e só o próximo passo concreto vai pra `hoje`.
+- **Rituais**: diário (10 min, esvaziar captura + escolher MITs + limpar concluídas) e semanal (segunda, zerar captura + revisar aguardando + quebrar as complexas em próximos passos).
+- **Regra de priorização** (quando em dúvida): move meta da semana/Feirão? tem prazo real? tem alguém bloqueado esperando? Dois "sim" = hoje, um = semana, nenhum = depois.
+
+## Decisões técnicas (e o que foi descartado)
+
+- **Stack**: HTML/CSS/JS puro, sem build, sem framework. Um arquivo. Supabase JS via CDN.
+- **Persistência: Supabase com login (Supabase Auth, e-mail/senha).** Descartadas duas alternativas:
+  - `window.storage` de artefato Claude: persiste, mas preso ao ambiente da Claude, sem app próprio.
+  - `localStorage` puro: simples, mas um dispositivo só, sem sincronizar note e celular.
+  - O login foi escolhido porque é a única opção que entrega o requisito original: acessar de qualquer lugar, sincronizado e privado.
+- **Segurança**: a chave `anon` é pública por design. A proteção vem de Auth + Row Level Security (RLS): cada usuário só enxerga as próprias linhas. RLS está no `setup.sql`.
+- **UI**: paleta clara com um código de cor por balde (âmbar/hoje, azul/semana, violeta/aguardando, cinza/depois). Sem dependências de fonte externa. Responsivo até mobile.
+
+## Arquivos
+
+- `index.html` — o app inteiro (UI + auth + CRUD Supabase). As chaves ficam em duas constantes no topo do script (`SUPABASE_URL`, `SUPABASE_ANON_KEY`), com placeholders. Se não configuradas, o app mostra uma tela de "falta configurar".
+- `setup.sql` — cria a tabela `tasks` e liga o RLS. Rodar uma vez no SQL Editor do Supabase.
+- `README.md` — este arquivo.
+
+## Schema
+
+Tabela `tasks`: `id` (uuid), `user_id` (uuid, default `auth.uid()`, FK pra `auth.users`, on delete cascade), `text` (text), `bucket` (text, default `inbox`), `done` (bool, default false), `created_at` (timestamptz). RLS ligado com policy `for all using (auth.uid() = user_id) with check (...)`. SQL completo no `setup.sql`.
+
+## Setup pendente (não feito ainda)
+
+1. Rodar `setup.sql` no SQL Editor do Supabase.
+2. Copiar Project URL e chave `anon public` (Project Settings > API).
+3. Colar as duas nas constantes do topo de `index.html`.
+4. Deploy do `index.html` no Netlify.
+5. Criar o login na tela do app e usar.
+6. Opcional: desligar "Confirm email" em Authentication > Providers > Email pra login imediato.
+
+## Ideias de próximos passos (não pedidas ainda)
+
+- Ordenação/arrastar dentro do balde e persistir posição (hoje ordena por `created_at`).
+- Data de vencimento e um destaque visual pro que vence hoje.
+- Realtime do Supabase pra sincronizar entre abas/dispositivos abertos ao mesmo tempo.
+- Subtarefas/próximos passos dentro de uma tarefa de `semana`.
+- Atalho de captura rápida (PWA + share target no celular) pra jogar nota direto no `inbox`.
+- Integração de entrada com as ferramentas dela (Pipedrive/HubSpot/Slack) pra capturar demanda sem digitar.
+
+## Notas
+
+- Sem framework de propósito: mantém leve e fácil de editar. Se for crescer muito, considerar um bundler, mas o requisito é "simples".
+- Free tier do Supabase pausa após ~1 semana de inatividade; uso diário evita. Dados persistem na pausa.

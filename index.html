@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Meu dia · organizador</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --paper: #FBFAF7; --card: #FFFFFF; --ink: #23262B; --muted: #6B7079;
+    --line: #E7E4DC; --done: #3F8F6B;
+    --today: #D9822B; --today-bg: #FBF1E3;
+    --week: #3E6C8E; --week-bg: #EAF1F6;
+    --wait: #8A7CA8; --wait-bg: #F1EDF5;
+    --later: #8B9096; --later-bg: #F1F1EF;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.45; }
+  .wrap { max-width: 1140px; margin: 0 auto; padding: 28px 20px 60px; }
+
+  header.top { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 22px; }
+  h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; margin: 0; }
+  h1 span { color: var(--muted); font-weight: 500; }
+  .who { color: var(--muted); font-size: 13px; }
+  .who button { border: none; background: none; color: var(--week); cursor: pointer; font-size: 13px; text-decoration: underline; padding: 0 0 0 8px; }
+  .date { color: var(--muted); font-size: 13px; text-transform: capitalize; margin-bottom: 20px; }
+
+  .capture { display: flex; gap: 8px; margin-bottom: 6px; }
+  .capture input { flex: 1; font-size: 15px; padding: 13px 15px; border: 1.5px solid var(--line); border-radius: 11px; background: var(--card); color: var(--ink); outline: none; }
+  .capture input:focus { border-color: var(--ink); }
+  .capture button { border: none; background: var(--ink); color: #fff; font-size: 14px; font-weight: 600; padding: 0 20px; border-radius: 11px; cursor: pointer; }
+  .hint { color: var(--muted); font-size: 12.5px; margin: 0 2px 20px; }
+
+  .inbox { background: var(--card); border: 1.5px dashed var(--line); border-radius: 14px; padding: 14px 16px; margin-bottom: 22px; }
+  .inbox.empty { display: none; }
+  .inbox h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 10px; }
+  .inbox-item { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-top: 1px solid var(--line); }
+  .inbox-item:first-of-type { border-top: none; }
+  .inbox-item .txt { flex: 1; font-size: 14.5px; }
+  .chips { display: flex; gap: 5px; flex-wrap: wrap; }
+  .chip { border: 1px solid var(--line); background: var(--paper); border-radius: 20px; font-size: 11.5px; padding: 4px 10px; cursor: pointer; color: var(--ink); white-space: nowrap; }
+  .chip:hover { border-color: var(--ink); }
+  .chip.c-today:hover { background: var(--today-bg); border-color: var(--today); }
+  .chip.c-week:hover { background: var(--week-bg); border-color: var(--week); }
+  .chip.c-wait:hover { background: var(--wait-bg); border-color: var(--wait); }
+  .chip.c-later:hover { background: var(--later-bg); border-color: var(--later); }
+  .x { border: none; background: none; color: var(--muted); cursor: pointer; font-size: 17px; line-height: 1; padding: 2px 4px; }
+  .x:hover { color: #c0392b; }
+
+  .board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  @media (max-width: 860px) { .board { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 560px) { .board { grid-template-columns: 1fr; } }
+  .col { background: var(--card); border: 1.5px solid var(--line); border-radius: 14px; padding: 14px; min-height: 120px; }
+  .col-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; }
+  .col-title { font-size: 13.5px; font-weight: 700; }
+  .col-sub { font-size: 11px; color: var(--muted); margin-left: auto; }
+  .col[data-b="hoje"] { border-top: 3px solid var(--today); }
+  .col[data-b="semana"] { border-top: 3px solid var(--week); }
+  .col[data-b="aguardando"] { border-top: 3px solid var(--wait); }
+  .col[data-b="depois"] { border-top: 3px solid var(--later); }
+  .d-hoje { background: var(--today); } .d-semana { background: var(--week); }
+  .d-aguardando { background: var(--wait); } .d-depois { background: var(--later); }
+  .over { color: #c0392b; font-weight: 600; }
+
+  .task { border-top: 1px solid var(--line); padding: 9px 0; }
+  .task:first-of-type { border-top: none; }
+  .task-row { display: flex; align-items: flex-start; gap: 9px; }
+  .cb { margin-top: 3px; width: 16px; height: 16px; cursor: pointer; accent-color: var(--done); flex: none; }
+  .task .txt { flex: 1; font-size: 14px; cursor: pointer; }
+  .task.done .txt { text-decoration: line-through; color: var(--muted); }
+  .task .move { display: none; gap: 5px; flex-wrap: wrap; margin: 8px 0 2px 25px; }
+  .task.open .move { display: flex; }
+  .empty-note { color: var(--muted); font-size: 12.5px; font-style: italic; padding: 4px 0; }
+  .clearbtn { margin-top: 8px; border: none; background: none; color: var(--muted); font-size: 12px; cursor: pointer; padding: 2px 0; }
+  .clearbtn:hover { color: var(--done); }
+
+  details.method { margin-top: 30px; border: 1.5px solid var(--line); border-radius: 14px; background: var(--card); padding: 4px 18px; }
+  details.method summary { cursor: pointer; font-size: 13px; font-weight: 600; padding: 12px 0; list-style: none; }
+  details.method summary::-webkit-details-marker { display: none; }
+  details.method summary::before { content: "▸ "; color: var(--muted); }
+  details.method[open] summary::before { content: "▾ "; }
+  .method-body { font-size: 13.5px; color: #3d4148; padding-bottom: 16px; }
+  .method-body b { color: var(--ink); }
+  .method-body p { margin: 0 0 10px; }
+
+  .center { max-width: 380px; margin: 60px auto; }
+  .center h1 { margin-bottom: 6px; }
+  .center p { color: var(--muted); font-size: 14px; margin: 0 0 22px; }
+  .field { display: block; margin-bottom: 12px; }
+  .field input { width: 100%; font-size: 15px; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: 11px; outline: none; }
+  .field input:focus { border-color: var(--ink); }
+  .primary { width: 100%; border: none; background: var(--ink); color: #fff; font-size: 15px; font-weight: 600; padding: 13px; border-radius: 11px; cursor: pointer; }
+  .link { background: none; border: none; color: var(--week); cursor: pointer; font-size: 13.5px; text-decoration: underline; margin-top: 14px; display: inline-block; }
+  .msg { font-size: 13px; margin: 12px 0 0; min-height: 18px; }
+  .msg.err { color: #c0392b; }
+  .msg.ok { color: var(--done); }
+  .setup { max-width: 620px; margin: 60px auto; font-size: 14px; color: #3d4148; }
+  .setup code { background: #F1EFEA; padding: 2px 6px; border-radius: 5px; font-size: 13px; }
+  .loading { color: var(--muted); font-size: 14px; padding: 60px 0; text-align: center; }
+</style>
+</head>
+<body>
+<div class="wrap" id="root"><div class="loading">Carregando…</div></div>
+
+<script>
+/* ============================================================
+   1) COLE SUAS DUAS CHAVES PÚBLICAS DO SUPABASE AQUI.
+   Project Settings > API. São as chaves "URL" e "anon public".
+   (A chave anon é pública por design — a proteção real vem do
+   login + row-level security que você vai ligar no SQL.)
+   ============================================================ */
+const SUPABASE_URL = "COLE_SUA_URL_AQUI";
+const SUPABASE_ANON_KEY = "COLE_SUA_ANON_KEY_AQUI";
+
+const BUCKETS = [
+  { id: "hoje", title: "Hoje", sub: "máx. 3 chave" },
+  { id: "semana", title: "Esta semana", sub: "complexas" },
+  { id: "aguardando", title: "Aguardando", sub: "depende de alguém" },
+  { id: "depois", title: "Depois", sub: "não perder" },
+];
+const CHIPS = [
+  { b: "hoje", label: "Hoje", cls: "c-today" },
+  { b: "semana", label: "Semana", cls: "c-week" },
+  { b: "aguardando", label: "Aguardando", cls: "c-wait" },
+  { b: "depois", label: "Depois", cls: "c-later" },
+];
+
+const root = document.getElementById("root");
+const esc = (s) => (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+let sb = null, tasks = [], userEmail = "";
+
+function boot() {
+  if (SUPABASE_URL.startsWith("COLE_") || SUPABASE_ANON_KEY.startsWith("COLE_")) {
+    root.innerHTML =
+      '<div class="setup"><h1>Falta configurar</h1>' +
+      "<p>Abra o arquivo <code>index.html</code>, cole sua <code>URL</code> e sua <code>anon key</code> do Supabase no topo do script (bloco marcado) e publique de novo. O passo a passo completo está na conversa com a Claude.</p></div>";
+    return;
+  }
+  sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  sb.auth.onAuthStateChange((_e, session) => {
+    if (session && session.user) { userEmail = session.user.email; loadAndRender(); }
+    else renderAuth();
+  });
+}
+
+/* ---------- AUTH ---------- */
+function renderAuth(mode) {
+  mode = mode || "in";
+  const signup = mode === "up";
+  root.innerHTML =
+    '<div class="center"><h1>Meu dia <span>· organizador</span></h1>' +
+    "<p>" + (signup ? "Crie seu acesso." : "Entre para ver suas tarefas.") + "</p>" +
+    '<label class="field"><input id="email" type="email" placeholder="e-mail" autocomplete="username" /></label>' +
+    '<label class="field"><input id="pass" type="password" placeholder="senha" autocomplete="current-password" /></label>' +
+    '<button class="primary" id="go">' + (signup ? "Criar acesso" : "Entrar") + "</button>" +
+    '<div class="msg" id="msg"></div>' +
+    '<button class="link" id="swap">' + (signup ? "Já tenho acesso — entrar" : "Primeira vez? Criar acesso") + "</button></div>";
+
+  document.getElementById("swap").onclick = () => renderAuth(signup ? "in" : "up");
+  document.getElementById("go").onclick = doAuth(signup);
+  ["email", "pass"].forEach((id) =>
+    document.getElementById(id).addEventListener("keydown", (e) => { if (e.key === "Enter") doAuth(signup)(); })
+  );
+}
+function doAuth(signup) {
+  return async () => {
+    const email = document.getElementById("email").value.trim();
+    const password = document.getElementById("pass").value;
+    const msg = document.getElementById("msg");
+    msg.className = "msg"; msg.textContent = "…";
+    try {
+      if (signup) {
+        const { error } = await sb.auth.signUp({ email, password });
+        if (error) throw error;
+        msg.className = "msg ok";
+        msg.textContent = "Acesso criado. Se pedir confirmação, confira seu e-mail e depois entre.";
+      } else {
+        const { error } = await sb.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+      }
+    } catch (e) { msg.className = "msg err"; msg.textContent = e.message || "Não deu certo, tente de novo."; }
+  };
+}
+async function signOut() { await sb.auth.signOut(); }
+
+/* ---------- DADOS ---------- */
+async function loadAndRender() {
+  root.innerHTML = '<div class="loading">Carregando suas tarefas…</div>';
+  const { data, error } = await sb.from("tasks").select("*").order("created_at", { ascending: true });
+  if (error) { root.innerHTML = '<div class="loading">Erro ao carregar: ' + esc(error.message) + "</div>"; return; }
+  tasks = data || [];
+  renderApp();
+}
+async function addTask(text) {
+  const { error } = await sb.from("tasks").insert({ text, bucket: "inbox", done: false });
+  if (!error) loadAndRender();
+}
+async function moveTask(id, to) {
+  const { error } = await sb.from("tasks").update({ bucket: to, done: false }).eq("id", id);
+  if (!error) loadAndRender();
+}
+async function toggleTask(id, done) {
+  const { error } = await sb.from("tasks").update({ done }).eq("id", id);
+  if (!error) loadAndRender();
+}
+async function delTask(id) {
+  const { error } = await sb.from("tasks").delete().eq("id", id);
+  if (!error) loadAndRender();
+}
+async function clearDone(bucket) {
+  const { error } = await sb.from("tasks").delete().eq("bucket", bucket).eq("done", true);
+  if (!error) loadAndRender();
+}
+
+/* ---------- APP ---------- */
+function renderApp() {
+  const inbox = tasks.filter((t) => t.bucket === "inbox");
+  let html =
+    '<header class="top"><h1>Meu dia <span>· organizador</span></h1>' +
+    '<div class="who">' + esc(userEmail) + '<button id="out">sair</button></div></header>' +
+    '<div class="date">' + new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" }) + "</div>" +
+    '<div class="capture"><input id="capInput" placeholder="Anota qualquer coisa que chegou… (Enter pra capturar)" autocomplete="off" />' +
+    '<button id="capBtn">Capturar</button></div>' +
+    '<p class="hint">Capturar não é decidir. Joga tudo aqui primeiro e organiza depois.</p>';
+
+  html += '<div class="inbox' + (inbox.length ? "" : " empty") + '"><h2>Caixa de captura (' + inbox.length + ")</h2>";
+  inbox.forEach((t) => {
+    html += '<div class="inbox-item"><span class="txt">' + esc(t.text) + '</span><span class="chips">';
+    CHIPS.forEach((c) => { html += '<button class="chip ' + c.cls + '" data-move="' + t.id + '" data-to="' + c.b + '">' + c.label + "</button>"; });
+    html += '</span><button class="x" data-del="' + t.id + '" title="descartar">×</button></div>';
+  });
+  html += "</div>";
+
+  html += '<div class="board">';
+  BUCKETS.forEach((b) => {
+    const items = tasks.filter((t) => t.bucket === b.id);
+    const active = items.filter((t) => !t.done).length;
+    const hasDone = items.some((t) => t.done);
+    html += '<div class="col" data-b="' + b.id + '"><div class="col-head"><span class="dot d-' + b.id + '"></span>';
+    html += '<span class="col-title">' + b.title + "</span>";
+    let sub = b.sub;
+    if (b.id === "hoje") sub = active + "/3" + (active > 3 ? " — foca!" : "");
+    html += '<span class="col-sub' + (b.id === "hoje" && active > 3 ? " over" : "") + '">' + sub + "</span></div>";
+    if (!items.length) html += '<div class="empty-note">vazio</div>';
+    items.forEach((t) => {
+      html += '<div class="task' + (t.done ? " done" : "") + '" data-id="' + t.id + '"><div class="task-row">';
+      html += '<input type="checkbox" class="cb" data-toggle="' + t.id + '"' + (t.done ? " checked" : "") + " />";
+      html += '<span class="txt" data-open="' + t.id + '">' + esc(t.text) + "</span>";
+      html += '<button class="x" data-del="' + t.id + '" title="remover">×</button></div><div class="move">';
+      CHIPS.filter((c) => c.b !== b.id).forEach((c) => { html += '<button class="chip ' + c.cls + '" data-move="' + t.id + '" data-to="' + c.b + '">→ ' + c.label + "</button>"; });
+      html += "</div></div>";
+    });
+    if (hasDone) html += '<button class="clearbtn" data-clear="' + b.id + '">limpar concluídas</button>';
+    html += "</div>";
+  });
+  html += "</div>";
+
+  html +=
+    '<details class="method"><summary>Como usar (o método)</summary><div class="method-body">' +
+    "<p><b>Ritual diário (10 min):</b> esvazia a captura, escolhe até 3 chave pro Hoje, distribui o resto. No fim do dia, limpa as concluídas.</p>" +
+    "<p><b>Ritual semanal (segunda):</b> zera a captura, revê o Aguardando e cobra quem precisa, quebra as de Esta semana em próximos passos.</p>" +
+    '<p><b>Priorização, na dúvida:</b> move uma meta da semana / do Feirão? tem prazo real? tem alguém bloqueado te esperando? Dois "sim" = Hoje. Um = Semana. Nenhum = Depois.</p>' +
+    "</div></details>";
+
+  root.innerHTML = html;
+
+  document.getElementById("out").onclick = signOut;
+  const cap = () => { const el = document.getElementById("capInput"); const v = el.value.trim(); if (v) { addTask(v); el.value = ""; } };
+  document.getElementById("capBtn").onclick = cap;
+  document.getElementById("capInput").addEventListener("keydown", (e) => { if (e.key === "Enter") cap(); });
+
+  root.querySelector(".board").parentNode.addEventListener("click", (e) => {
+    const d = e.target.dataset;
+    if (d.move) moveTask(d.move, d.to);
+    else if (d.del) delTask(d.del);
+    else if (d.clear) clearDone(d.clear);
+    else if (d.open) { const el = root.querySelector('.task[data-id="' + d.open + '"]'); if (el) el.classList.toggle("open"); }
+  });
+  root.addEventListener("change", (e) => { if (e.target.dataset.toggle) toggleTask(e.target.dataset.toggle, e.target.checked); });
+}
+
+boot();
+</script>
+</body>
+</html>
