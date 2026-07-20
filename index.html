@@ -393,31 +393,33 @@ function renderApp() {
   const cap = () => { const el = document.getElementById("capInput"); const v = el.value.trim(); if (v) { addTask(v); el.value = ""; } };
   document.getElementById("capBtn").onclick = cap;
   document.getElementById("capInput").addEventListener("keydown", (e) => { if (e.key === "Enter") cap(); });
-
-  root.querySelector(".board").parentNode.addEventListener("click", (e) => {
-    const moveBtn = e.target.closest("[data-move]");
-    const delBtn = e.target.closest("[data-del]");
-    const clearBtn = e.target.closest("[data-clear]");
-    const urgentBtn = e.target.closest("[data-urgent]");
-    const moreBtn = e.target.closest("[data-more]");
-    const lessBtn = e.target.closest("[data-less]");
-    const openEl = e.target.closest("[data-open]");
-    if (moveBtn) moveTask(moveBtn.dataset.move, moveBtn.dataset.to);
-    else if (delBtn) delTask(delBtn.dataset.del);
-    else if (clearBtn) clearDone(clearBtn.dataset.clear);
-    else if (urgentBtn) { const id = urgentBtn.dataset.urgent; const t = tasks.find((x) => x.id === id); toggleUrgent(id, t && t.urgent); }
-    else if (moreBtn) { expandedCols[moreBtn.dataset.more] = true; renderApp(); }
-    else if (lessBtn) { delete expandedCols[lessBtn.dataset.less]; renderApp(); }
-    else if (openEl) { const el = root.querySelector('.task[data-id="' + openEl.dataset.open + '"]'); if (el) el.classList.toggle("open"); }
-  });
-  root.addEventListener("change", (e) => {
-    if (e.target.dataset.toggle) toggleTask(e.target.dataset.toggle, e.target.checked);
-    else if (e.target.dataset.due) updateDue(e.target.dataset.due, e.target.value);
-  });
-  root.addEventListener("focusout", (e) => {
-    if (e.target.dataset.area) updateArea(e.target.dataset.area, e.target.value.trim());
-  });
 }
+
+/* Anexados uma única vez em #root (que nunca é recriado) — evita acumular
+   listeners duplicados a cada renderApp() e o toggle "cancelar a si mesmo". */
+root.addEventListener("click", (e) => {
+  const moveBtn = e.target.closest("[data-move]");
+  const delBtn = e.target.closest("[data-del]");
+  const clearBtn = e.target.closest("[data-clear]");
+  const urgentBtn = e.target.closest("[data-urgent]");
+  const moreBtn = e.target.closest("[data-more]");
+  const lessBtn = e.target.closest("[data-less]");
+  const openEl = e.target.closest("[data-open]");
+  if (moveBtn) moveTask(moveBtn.dataset.move, moveBtn.dataset.to);
+  else if (delBtn) delTask(delBtn.dataset.del);
+  else if (clearBtn) clearDone(clearBtn.dataset.clear);
+  else if (urgentBtn) { const id = urgentBtn.dataset.urgent; const t = tasks.find((x) => x.id === id); toggleUrgent(id, t && t.urgent); }
+  else if (moreBtn) { expandedCols[moreBtn.dataset.more] = true; renderApp(); }
+  else if (lessBtn) { delete expandedCols[lessBtn.dataset.less]; renderApp(); }
+  else if (openEl) { const el = root.querySelector('.task[data-id="' + openEl.dataset.open + '"]'); if (el) el.classList.toggle("open"); }
+});
+root.addEventListener("change", (e) => {
+  if (e.target.dataset.toggle) toggleTask(e.target.dataset.toggle, e.target.checked);
+  else if (e.target.dataset.due) updateDue(e.target.dataset.due, e.target.value);
+});
+root.addEventListener("focusout", (e) => {
+  if (e.target.dataset.area) updateArea(e.target.dataset.area, e.target.value.trim());
+});
 
 boot();
 </script>
