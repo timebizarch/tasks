@@ -18,7 +18,8 @@
     --week: #07C1D6; --week-bg: #EEF7FB;
     --wait: #7B17A2; --wait-bg: #FDFAFF;
     --later: #8E9BA1; --later-bg: #F4F5F6;
-    --error: #D1436E;
+    --error: #D1436E; --error-bg: #FDF4F4;
+    --alert: #B4790A; --alert-bg: #FFFAF1;
     --radius-sm: 8px; --radius-md: 12px; --radius-lg: 16px; --radius-xl: 24px; --radius-pill: 999px;
     --shadow-sm: 0 2px 6px rgba(16,36,54,.06), 0 1px 2px rgba(16,36,54,.04);
     --shadow-md: 0 6px 16px rgba(16,36,54,.08), 0 2px 4px rgba(16,36,54,.04);
@@ -85,9 +86,22 @@
   .cb { margin-top: 3px; width: 16px; height: 16px; cursor: pointer; accent-color: var(--done); flex: none; }
   .task .txt { flex: 1; font-size: 14px; cursor: pointer; }
   .task.done .txt { text-decoration: line-through; color: var(--muted-2); }
-  .task .move { display: none; gap: 5px; flex-wrap: wrap; margin: 8px 0 2px 25px; }
+  .task .move { display: none; flex-direction: column; gap: 8px; margin: 8px 0 2px 25px; }
   .task.open .move { display: flex; }
+  .move-chips { display: flex; gap: 5px; flex-wrap: wrap; }
   .empty-note { color: var(--muted-2); font-size: 12.5px; font-style: italic; padding: 4px 0; }
+
+  .tag-urgent { color: var(--error); margin-right: 3px; }
+  .tag-area, .tag-due { font-size: 11px; padding: 2px 8px; border-radius: var(--radius-pill); margin-left: 6px; background: var(--later-bg); color: var(--muted); white-space: nowrap; }
+  .tag-due-today { background: var(--alert-bg); color: var(--alert); font-weight: 600; }
+  .tag-due-overdue { background: var(--error-bg); color: var(--error); font-weight: 700; }
+
+  .meta-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .meta-row input { font-size: 12.5px; padding: 6px 9px; border: 1px solid var(--line); border-radius: var(--radius-sm); font-family: var(--font-body); background: var(--card); color: var(--ink); outline: none; }
+  .meta-row input[data-area] { width: 120px; }
+  .meta-row input:focus { border-color: var(--accent); box-shadow: var(--shadow-focus); }
+  .meta-urgent-btn { font-size: 12px; border: 1px solid var(--line); background: var(--card); border-radius: var(--radius-pill); padding: 5px 11px; cursor: pointer; font-family: var(--font-body); color: var(--muted); }
+  .meta-urgent-btn.on { background: var(--error-bg); border-color: var(--error); color: var(--error); font-weight: 700; }
   .clearbtn { margin-top: 8px; border: none; background: none; color: var(--muted); font-size: 12px; cursor: pointer; padding: 2px 0; font-family: var(--font-body); }
   .clearbtn:hover { color: var(--done); }
 
@@ -173,6 +187,7 @@ const ICON_D = {
   week: 'M3 6h18v15H3zM3 6V4a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v2M8 2v4M16 2v4M3 10h18',
   close: 'M18 6L6 18M6 6l12 12',
   plus: 'M12 5v14M5 12h14',
+  flame: 'M12 2c1 3-1.5 4.5-3 7-1 1.7-1.5 3-1.5 4.5a4.5 4.5 0 0 0 9 0c0-1.8-.7-3-1.8-4.3.1 1.6-.6 2.5-1.5 2.5-1.2 0-1.7-1-1.2-2.2C13 7.5 12.5 4.5 12 2z',
 };
 const ICON_EXTRA = {
   wait: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>',
@@ -184,6 +199,16 @@ function icon(name, size, style) {
   return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="flex:none;vertical-align:-3px;' + (style || '') + '">' + inner + '</svg>';
 }
 const BUCKET_ICON = { hoje: 'today', semana: 'week', aguardando: 'wait', depois: 'later' };
+
+function dueStatus(iso) {
+  if (!iso) return "";
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const d = new Date(iso + "T00:00:00");
+  if (d < today) return "overdue";
+  if (d.getTime() === today.getTime()) return "today";
+  return "";
+}
+function fmtDue(iso) { const [, m, d] = iso.split("-"); return d + "/" + m; }
 
 const root = document.getElementById("root");
 const esc = (s) => (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -281,11 +306,24 @@ async function clearDone(bucket) {
   const { error } = await sb.from("tasks").delete().eq("bucket", bucket).eq("done", true);
   if (!error) loadAndRender();
 }
+async function updateArea(id, area) {
+  const { error } = await sb.from("tasks").update({ area: area || null }).eq("id", id);
+  if (!error) loadAndRender();
+}
+async function updateDue(id, due) {
+  const { error } = await sb.from("tasks").update({ due_date: due || null }).eq("id", id);
+  if (!error) loadAndRender();
+}
+async function toggleUrgent(id, current) {
+  const { error } = await sb.from("tasks").update({ urgent: !current }).eq("id", id);
+  if (!error) loadAndRender();
+}
 
 /* ---------- APP ---------- */
 function renderApp() {
   const inbox = tasks.filter((t) => t.bucket === "inbox");
-  let html =
+  const areas = Array.from(new Set(tasks.map((t) => t.area).filter(Boolean)));
+  let html = '<datalist id="areaList">' + areas.map((a) => '<option value="' + esc(a) + '">').join("") + '</datalist>' +
     '<header class="top"><h1>' + LOGO + 'Meu dia <span>· organizador</span></h1>' +
     '<div class="who">' + esc(userEmail) + '<button id="out">sair</button></div></header>' +
     '<div class="date">' + new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" }) + "</div>" +
@@ -313,12 +351,23 @@ function renderApp() {
     html += '<span class="col-sub' + (b.id === "hoje" && active > 3 ? " over" : "") + '">' + sub + "</span></div>";
     if (!items.length) html += '<div class="empty-note">vazio</div>';
     items.forEach((t) => {
+      const due = t.due_date ? dueStatus(t.due_date) : "";
       html += '<div class="task' + (t.done ? " done" : "") + '" data-id="' + t.id + '"><div class="task-row">';
       html += '<input type="checkbox" class="cb" data-toggle="' + t.id + '"' + (t.done ? " checked" : "") + " />";
-      html += '<span class="txt" data-open="' + t.id + '">' + esc(t.text) + "</span>";
+      html += '<span class="txt" data-open="' + t.id + '">';
+      if (t.urgent) html += '<span class="tag-urgent" title="urgente">' + icon('flame', 14) + '</span>';
+      html += esc(t.text);
+      if (t.area) html += '<span class="tag-area">' + esc(t.area) + '</span>';
+      if (t.due_date) html += '<span class="tag-due' + (due ? " tag-due-" + due : "") + '">' + fmtDue(t.due_date) + '</span>';
+      html += "</span>";
       html += '<button class="x" data-del="' + t.id + '" title="remover">' + icon('close', 13) + '</button></div><div class="move">';
+      html += '<div class="move-chips">';
       CHIPS.filter((c) => c.b !== b.id).forEach((c) => { html += '<button class="chip ' + c.cls + '" data-move="' + t.id + '" data-to="' + c.b + '">→ ' + c.label + "</button>"; });
-      html += "</div></div>";
+      html += '</div><div class="meta-row">';
+      html += '<input type="text" data-area="' + t.id + '" list="areaList" placeholder="área" value="' + esc(t.area || "") + '" />';
+      html += '<input type="date" data-due="' + t.id + '" value="' + (t.due_date || "") + '" />';
+      html += '<button class="meta-urgent-btn' + (t.urgent ? " on" : "") + '" data-urgent="' + t.id + '">' + icon('flame', 13) + ' urgente</button>';
+      html += "</div></div></div>";
     });
     if (hasDone) html += '<button class="clearbtn" data-clear="' + b.id + '">limpar concluídas</button>';
     html += "</div>";
@@ -340,13 +389,24 @@ function renderApp() {
   document.getElementById("capInput").addEventListener("keydown", (e) => { if (e.key === "Enter") cap(); });
 
   root.querySelector(".board").parentNode.addEventListener("click", (e) => {
-    const d = e.target.dataset;
-    if (d.move) moveTask(d.move, d.to);
-    else if (d.del) delTask(d.del);
-    else if (d.clear) clearDone(d.clear);
-    else if (d.open) { const el = root.querySelector('.task[data-id="' + d.open + '"]'); if (el) el.classList.toggle("open"); }
+    const moveBtn = e.target.closest("[data-move]");
+    const delBtn = e.target.closest("[data-del]");
+    const clearBtn = e.target.closest("[data-clear]");
+    const urgentBtn = e.target.closest("[data-urgent]");
+    const openEl = e.target.closest("[data-open]");
+    if (moveBtn) moveTask(moveBtn.dataset.move, moveBtn.dataset.to);
+    else if (delBtn) delTask(delBtn.dataset.del);
+    else if (clearBtn) clearDone(clearBtn.dataset.clear);
+    else if (urgentBtn) { const id = urgentBtn.dataset.urgent; const t = tasks.find((x) => x.id === id); toggleUrgent(id, t && t.urgent); }
+    else if (openEl) { const el = root.querySelector('.task[data-id="' + openEl.dataset.open + '"]'); if (el) el.classList.toggle("open"); }
   });
-  root.addEventListener("change", (e) => { if (e.target.dataset.toggle) toggleTask(e.target.dataset.toggle, e.target.checked); });
+  root.addEventListener("change", (e) => {
+    if (e.target.dataset.toggle) toggleTask(e.target.dataset.toggle, e.target.checked);
+    else if (e.target.dataset.due) updateDue(e.target.dataset.due, e.target.value);
+  });
+  root.addEventListener("focusout", (e) => {
+    if (e.target.dataset.area) updateArea(e.target.dataset.area, e.target.value.trim());
+  });
 }
 
 boot();

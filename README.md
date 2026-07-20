@@ -40,7 +40,9 @@ Separar três coisas que hoje se misturam: capturar, priorizar, executar.
 
 ## Schema
 
-Tabela `tasks`: `id` (uuid), `user_id` (uuid, default `auth.uid()`, FK pra `auth.users`, on delete cascade), `text` (text), `bucket` (text, default `inbox`), `done` (bool, default false), `created_at` (timestamptz). RLS ligado com policy `for all using (auth.uid() = user_id) with check (...)`. SQL completo no `setup.sql`.
+Tabela `tasks`: `id` (uuid), `user_id` (uuid, default `auth.uid()`, FK pra `auth.users`, on delete cascade), `text` (text), `bucket` (text, default `inbox`), `done` (bool, default false), `created_at` (timestamptz), `area` (text, opcional — tag livre tipo "growth"/"ops"), `urgent` (bool, default false), `due_date` (date, opcional). RLS ligado com policy `for all using (auth.uid() = user_id) with check (...)`. SQL completo no `setup.sql`.
+
+**v2 — priorização leve:** decidido não usar matriz GUT (gravidade/urgência/tendência) por tarefa porque adiciona fricção na captura. Em vez disso: tag de área livre (texto, com sugestão das últimas usadas via `<datalist>`), flag de urgência (🔥) e prazo opcional — todos editados só na hora de organizar a tarefa (no painel que abre ao clicar nela), nunca na captura. Prazo vencido fica destacado em vermelho, prazo de hoje em âmbar. GUT continua útil como pergunta mental no ritual semanal, não como campo salvo.
 
 ## Setup pendente (não feito ainda)
 

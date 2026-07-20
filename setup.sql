@@ -17,3 +17,9 @@ create policy "cada um vê e mexe só nas suas tarefas"
   on tasks for all
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
+
+-- v2: tag de área (texto livre), urgência e prazo — todos opcionais.
+-- Cole e rode isto separadamente no SQL Editor (tabela já existe).
+alter table tasks add column if not exists area text;
+alter table tasks add column if not exists urgent boolean not null default false;
+alter table tasks add column if not exists due_date date;
