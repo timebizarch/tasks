@@ -215,6 +215,50 @@ function dueStatus(iso) {
   return "";
 }
 function fmtDue(iso) { const [, m, d] = iso.split("-"); return d + "/" + m; }
+
+/* ---------- CAPTURA INTELIGENTE ----------
+   "texto | área | até terça"  ->  área + prazo já preenchidos
+   "texto, urgente, até terça" (sem |) -> detecta "urgente" e "até <dia/data>" na frase */
+const WEEKDAY_MAP = { domingo: 0, segunda: 1, terca: 2, quarta: 3, quinta: 4, sexta: 5, sabado: 6 };
+function stripAccents(s) { return s.normalize("NFD").replace(/[̀-ͯ]/g, ""); }
+function nextDateForWeekday(dow) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const diff = (dow - today.getDay() + 7) % 7;
+  return new Date(today.getTime() + diff * 86400000).toISOString().slice(0, 10);
+}
+function parseDuePhrase(phrase) {
+  const p = stripAccents(phrase.trim().toLowerCase());
+  if (/\bhoje\b/.test(p)) return new Date().toISOString().slice(0, 10);
+  if (/\bamanha\b/.test(p)) return new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  const dm = p.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/);
+  if (dm) {
+    const day = dm[1].padStart(2, "0"), month = dm[2].padStart(2, "0");
+    const year = dm[3] ? (dm[3].length === 2 ? "20" + dm[3] : dm[3]) : String(new Date().getFullYear());
+    return year + "-" + month + "-" + day;
+  }
+  const wd = p.match(/\b(domingo|segunda|terca|quarta|quinta|sexta|sabado)\b/);
+  if (wd && WEEKDAY_MAP[wd[1]] !== undefined) return nextDateForWeekday(WEEKDAY_MAP[wd[1]]);
+  return null;
+}
+function smartParse(raw) {
+  let text = raw.trim(), area = null, urgent = false, due_date = null;
+  if (text.includes("|")) {
+    const parts = text.split("|").map((s) => s.trim()).filter(Boolean);
+    text = parts.shift() || text;
+    parts.forEach((p) => {
+      if (/\burgente\b/i.test(stripAccents(p))) { urgent = true; return; }
+      const d = parseDuePhrase(p);
+      if (d) { due_date = d; return; }
+      if (!area) area = p;
+    });
+  } else {
+    if (/\burgente\b/i.test(stripAccents(text))) { urgent = true; text = text.replace(/\burgente\b/gi, ""); }
+    const m = text.match(/\bat[ée]\s+([^,;.]+)/i) || text.match(/\b(hoje|amanh[ãa])\b/i);
+    if (m) { const d = parseDuePhrase(m[1] || m[0]); if (d) { due_date = d; text = text.replace(m[0], ""); } }
+    text = text.replace(/\s*,\s*,/g, ",").replace(/,\s*$/, "").replace(/^\s*,\s*/, "").replace(/\s{2,}/g, " ").trim();
+  }
+  return { text: text || raw.trim(), area, urgent, due_date };
+}
 function cmpTask(a, b) {
   if (!!a.done !== !!b.done) return a.done ? 1 : -1;
   const au = a.urgent ? 0 : 1, bu = b.urgent ? 0 : 1;
@@ -303,8 +347,12 @@ async function loadAndRender(quiet) {
   tasks = data || [];
   renderApp();
 }
-async function addTask(text) {
-  const { error } = await sb.from("tasks").insert({ text, bucket: "inbox", done: false });
+async function addTask(raw) {
+  const p = smartParse(raw);
+  const { error } = await sb.from("tasks").insert({
+    text: p.text, bucket: "inbox", done: false,
+    area: p.area, urgent: p.urgent, due_date: p.due_date,
+  });
   if (!error) loadAndRender(true);
 }
 async function moveTask(id, to) {
@@ -346,7 +394,8 @@ function renderApp() {
     '<div class="date">' + new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" }) + "</div>" +
     '<div class="capture"><input id="capInput" placeholder="Anota qualquer coisa que chegou… (Enter pra capturar)" autocomplete="off" />' +
     '<button id="capBtn">' + icon('plus', 15) + ' Capturar</button></div>' +
-    '<p class="hint">Capturar não é decidir. Joga tudo aqui primeiro e organiza depois.</p>';
+    '<p class="hint">Capturar não é decidir. Joga tudo aqui primeiro e organiza depois. ' +
+    'Dica: "tarefa | área | até terça" ou "tarefa, urgente, até sexta" já preenchem área/prazo/urgência.</p>';
 
   html += '<div class="inbox' + (inbox.length ? "" : " empty") + '"><h2>' + icon('later', 13) + ' Caixa de captura (' + inbox.length + ")</h2>";
   inbox.forEach((t) => {
