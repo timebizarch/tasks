@@ -281,8 +281,8 @@ function doAuth(signup) {
 async function signOut() { await sb.auth.signOut(); }
 
 /* ---------- DADOS ---------- */
-async function loadAndRender() {
-  root.innerHTML = '<div class="loading">Carregando suas tarefas…</div>';
+async function loadAndRender(quiet) {
+  if (!quiet) root.innerHTML = '<div class="loading">Carregando suas tarefas…</div>';
   const { data, error } = await sb.from("tasks").select("*").order("created_at", { ascending: true });
   if (error) { root.innerHTML = '<div class="loading">Erro ao carregar: ' + esc(error.message) + "</div>"; return; }
   tasks = data || [];
@@ -290,35 +290,35 @@ async function loadAndRender() {
 }
 async function addTask(text) {
   const { error } = await sb.from("tasks").insert({ text, bucket: "inbox", done: false });
-  if (!error) loadAndRender();
+  if (!error) loadAndRender(true);
 }
 async function moveTask(id, to) {
   const { error } = await sb.from("tasks").update({ bucket: to, done: false }).eq("id", id);
-  if (!error) loadAndRender();
+  if (!error) loadAndRender(true);
 }
 async function toggleTask(id, done) {
   const { error } = await sb.from("tasks").update({ done }).eq("id", id);
-  if (!error) loadAndRender();
+  if (!error) loadAndRender(true);
 }
 async function delTask(id) {
   const { error } = await sb.from("tasks").delete().eq("id", id);
-  if (!error) loadAndRender();
+  if (!error) loadAndRender(true);
 }
 async function clearDone(bucket) {
   const { error } = await sb.from("tasks").delete().eq("bucket", bucket).eq("done", true);
-  if (!error) loadAndRender();
+  if (!error) loadAndRender(true);
 }
 async function updateArea(id, area) {
   const { error } = await sb.from("tasks").update({ area: area || null }).eq("id", id);
-  if (!error) loadAndRender();
+  if (!error) loadAndRender(true);
 }
 async function updateDue(id, due) {
   const { error } = await sb.from("tasks").update({ due_date: due || null }).eq("id", id);
-  if (!error) loadAndRender();
+  if (!error) loadAndRender(true);
 }
 async function toggleUrgent(id, current) {
   const { error } = await sb.from("tasks").update({ urgent: !current }).eq("id", id);
-  if (!error) loadAndRender();
+  if (!error) loadAndRender(true);
 }
 
 /* ---------- APP ---------- */
