@@ -3,101 +3,131 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Meu dia · organizador</title>
+<title>Meu dia · organizador Yuca</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700;9..144,900&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --paper: #FBFAF7; --card: #FFFFFF; --ink: #23262B; --muted: #6B7079;
-    --line: #E7E4DC; --done: #3F8F6B;
-    --today: #D9822B; --today-bg: #FBF1E3;
-    --week: #3E6C8E; --week-bg: #EAF1F6;
-    --wait: #8A7CA8; --wait-bg: #F1EDF5;
-    --later: #8B9096; --later-bg: #F1F1EF;
+    /* Yuca brand tokens — Manual de Marca Yuca */
+    --paper: #FDFAF7; --card: #FFFFFF; --ink: #062840; --muted: #425158; --muted-2: #8E9BA1;
+    --line: #DDE1E3; --line-strong: #BBC3C7; --done: #13C081;
+    --accent: #12C68B; --accent-dark: #098C7B; --accent-lighten: #F2FBF7;
+    --today: #CE6363; --today-bg: #FEF5F5;
+    --week: #07C1D6; --week-bg: #EEF7FB;
+    --wait: #7B17A2; --wait-bg: #FDFAFF;
+    --later: #8E9BA1; --later-bg: #F4F5F6;
+    --error: #D1436E;
+    --radius-sm: 8px; --radius-md: 12px; --radius-lg: 16px; --radius-xl: 24px; --radius-pill: 999px;
+    --shadow-sm: 0 2px 6px rgba(16,36,54,.06), 0 1px 2px rgba(16,36,54,.04);
+    --shadow-md: 0 6px 16px rgba(16,36,54,.08), 0 2px 4px rgba(16,36,54,.04);
+    --shadow-lg: 0 20px 48px rgba(6,40,64,.16), 0 4px 10px rgba(6,40,64,.08);
+    --shadow-focus: 0 0 0 3px rgba(19,192,129,.25);
+    --font-display: 'Fraunces', Georgia, serif;
+    --font-body: 'Montserrat', system-ui, -apple-system, "Segoe UI", sans-serif;
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--paper); color: var(--ink);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.45; }
+    font-family: var(--font-body); line-height: 1.45; }
   .wrap { max-width: 1140px; margin: 0 auto; padding: 28px 20px 60px; }
 
   header.top { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 22px; }
-  h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; margin: 0; }
-  h1 span { color: var(--muted); font-weight: 500; }
+  h1 { font-family: var(--font-display); font-size: 25px; font-weight: 700; letter-spacing: -0.01em; margin: 0; display: flex; align-items: center; gap: 9px; }
+  h1 .logo { flex: none; }
+  h1 span { color: var(--muted); font-weight: 500; font-size: 0.8em; }
   .who { color: var(--muted); font-size: 13px; }
-  .who button { border: none; background: none; color: var(--week); cursor: pointer; font-size: 13px; text-decoration: underline; padding: 0 0 0 8px; }
+  .who button { border: none; background: none; color: var(--accent-dark); cursor: pointer; font-size: 13px; text-decoration: underline; padding: 0 0 0 8px; }
   .date { color: var(--muted); font-size: 13px; text-transform: capitalize; margin-bottom: 20px; }
 
   .capture { display: flex; gap: 8px; margin-bottom: 6px; }
-  .capture input { flex: 1; font-size: 15px; padding: 13px 15px; border: 1.5px solid var(--line); border-radius: 11px; background: var(--card); color: var(--ink); outline: none; }
-  .capture input:focus { border-color: var(--ink); }
-  .capture button { border: none; background: var(--ink); color: #fff; font-size: 14px; font-weight: 600; padding: 0 20px; border-radius: 11px; cursor: pointer; }
+  .capture input { flex: 1; font-size: 15px; padding: 13px 15px; border: 1.5px solid var(--line); border-radius: var(--radius-md); background: var(--card); color: var(--ink); outline: none; font-family: var(--font-body); transition: border-color 150ms, box-shadow 150ms; }
+  .capture input:focus { border-color: var(--accent); box-shadow: var(--shadow-focus); }
+  .capture button { border: none; background: var(--accent); color: #fff; font-size: 14px; font-weight: 700; padding: 0 20px; border-radius: var(--radius-md); cursor: pointer; font-family: var(--font-body); transition: background 150ms; }
+  .capture button:hover { background: var(--accent-dark); }
   .hint { color: var(--muted); font-size: 12.5px; margin: 0 2px 20px; }
 
-  .inbox { background: var(--card); border: 1.5px dashed var(--line); border-radius: 14px; padding: 14px 16px; margin-bottom: 22px; }
+  .inbox { background: var(--card); border: 1.5px dashed var(--line-strong); border-radius: var(--radius-lg); padding: 14px 16px; margin-bottom: 22px; }
   .inbox.empty { display: none; }
-  .inbox h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 10px; }
+  .inbox h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 10px; font-weight: 700; }
   .inbox-item { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-top: 1px solid var(--line); }
   .inbox-item:first-of-type { border-top: none; }
   .inbox-item .txt { flex: 1; font-size: 14.5px; }
   .chips { display: flex; gap: 5px; flex-wrap: wrap; }
-  .chip { border: 1px solid var(--line); background: var(--paper); border-radius: 20px; font-size: 11.5px; padding: 4px 10px; cursor: pointer; color: var(--ink); white-space: nowrap; }
+  .chip { border: 1px solid var(--line); background: var(--paper); border-radius: var(--radius-pill); font-size: 11.5px; padding: 4px 10px; cursor: pointer; color: var(--ink); white-space: nowrap; font-family: var(--font-body); }
   .chip:hover { border-color: var(--ink); }
   .chip.c-today:hover { background: var(--today-bg); border-color: var(--today); }
   .chip.c-week:hover { background: var(--week-bg); border-color: var(--week); }
   .chip.c-wait:hover { background: var(--wait-bg); border-color: var(--wait); }
   .chip.c-later:hover { background: var(--later-bg); border-color: var(--later); }
-  .x { border: none; background: none; color: var(--muted); cursor: pointer; font-size: 17px; line-height: 1; padding: 2px 4px; }
-  .x:hover { color: #c0392b; }
+  .x { border: none; background: none; color: var(--muted-2); cursor: pointer; font-size: 17px; line-height: 1; padding: 2px 4px; }
+  .x:hover { color: var(--error); }
 
   .board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
   @media (max-width: 860px) { .board { grid-template-columns: 1fr 1fr; } }
   @media (max-width: 560px) { .board { grid-template-columns: 1fr; } }
-  .col { background: var(--card); border: 1.5px solid var(--line); border-radius: 14px; padding: 14px; min-height: 120px; }
-  .col-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-  .dot { width: 9px; height: 9px; border-radius: 50%; }
-  .col-title { font-size: 13.5px; font-weight: 700; }
+  .col { background: var(--card); border: 1.5px solid var(--line); border-radius: var(--radius-lg); padding: 14px; min-height: 120px; box-shadow: var(--shadow-sm); }
+  .col-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .col-title { font-size: 13.5px; font-weight: 700; display: flex; align-items: center; gap: 5px; }
+  .bicon { display: inline-flex; }
+  .bi-hoje { color: var(--today); } .bi-semana { color: var(--week); }
+  .bi-aguardando { color: var(--wait); } .bi-depois { color: var(--later); }
   .col-sub { font-size: 11px; color: var(--muted); margin-left: auto; }
   .col[data-b="hoje"] { border-top: 3px solid var(--today); }
   .col[data-b="semana"] { border-top: 3px solid var(--week); }
   .col[data-b="aguardando"] { border-top: 3px solid var(--wait); }
   .col[data-b="depois"] { border-top: 3px solid var(--later); }
-  .d-hoje { background: var(--today); } .d-semana { background: var(--week); }
-  .d-aguardando { background: var(--wait); } .d-depois { background: var(--later); }
-  .over { color: #c0392b; font-weight: 600; }
+  .over { color: var(--error); font-weight: 700; }
 
   .task { border-top: 1px solid var(--line); padding: 9px 0; }
   .task:first-of-type { border-top: none; }
   .task-row { display: flex; align-items: flex-start; gap: 9px; }
   .cb { margin-top: 3px; width: 16px; height: 16px; cursor: pointer; accent-color: var(--done); flex: none; }
   .task .txt { flex: 1; font-size: 14px; cursor: pointer; }
-  .task.done .txt { text-decoration: line-through; color: var(--muted); }
+  .task.done .txt { text-decoration: line-through; color: var(--muted-2); }
   .task .move { display: none; gap: 5px; flex-wrap: wrap; margin: 8px 0 2px 25px; }
   .task.open .move { display: flex; }
-  .empty-note { color: var(--muted); font-size: 12.5px; font-style: italic; padding: 4px 0; }
-  .clearbtn { margin-top: 8px; border: none; background: none; color: var(--muted); font-size: 12px; cursor: pointer; padding: 2px 0; }
+  .empty-note { color: var(--muted-2); font-size: 12.5px; font-style: italic; padding: 4px 0; }
+  .clearbtn { margin-top: 8px; border: none; background: none; color: var(--muted); font-size: 12px; cursor: pointer; padding: 2px 0; font-family: var(--font-body); }
   .clearbtn:hover { color: var(--done); }
 
-  details.method { margin-top: 30px; border: 1.5px solid var(--line); border-radius: 14px; background: var(--card); padding: 4px 18px; }
-  details.method summary { cursor: pointer; font-size: 13px; font-weight: 600; padding: 12px 0; list-style: none; }
+  details.method { margin-top: 30px; border: 1.5px solid var(--line); border-radius: var(--radius-lg); background: var(--card); padding: 4px 18px; }
+  details.method summary { cursor: pointer; font-size: 13px; font-weight: 700; padding: 12px 0; list-style: none; }
   details.method summary::-webkit-details-marker { display: none; }
-  details.method summary::before { content: "▸ "; color: var(--muted); }
+  details.method summary::before { content: "▸ "; color: var(--accent-dark); }
   details.method[open] summary::before { content: "▾ "; }
-  .method-body { font-size: 13.5px; color: #3d4148; padding-bottom: 16px; }
+  .method-body { font-size: 13.5px; color: var(--muted); padding-bottom: 16px; }
   .method-body b { color: var(--ink); }
   .method-body p { margin: 0 0 10px; }
 
-  .center { max-width: 380px; margin: 60px auto; }
+  .auth-wrap { display: grid; grid-template-columns: 1.05fr 1fr; min-height: 560px; border-radius: var(--radius-xl); overflow: hidden; box-shadow: var(--shadow-lg); background: var(--card); margin-top: 16px; }
+  @media (max-width: 760px) { .auth-wrap { grid-template-columns: 1fr; min-height: auto; margin-top: 0; } }
+
+  .auth-art { position: relative; overflow: hidden; background: linear-gradient(155deg, var(--ink) 0%, var(--accent-dark) 100%); display: flex; flex-direction: column; justify-content: center; padding: 52px 48px; color: #fff; }
+  @media (max-width: 760px) { .auth-art { padding: 40px 28px 52px; } }
+  .auth-art .blob { position: absolute; border-radius: 50%; filter: blur(46px); pointer-events: none; }
+  .auth-art .blob-1 { width: 240px; height: 240px; background: var(--today); opacity: .55; top: -70px; right: -60px; }
+  .auth-art .blob-2 { width: 210px; height: 210px; background: var(--wait); opacity: .5; bottom: -70px; left: -50px; }
+  .auth-art .blob-3 { width: 170px; height: 170px; background: var(--week); opacity: .35; bottom: 26px; right: 30px; }
+  .auth-art-logo { position: relative; z-index: 1; margin-bottom: 22px; }
+  .auth-art h2 { position: relative; z-index: 1; font-family: var(--font-display); font-size: 28px; font-weight: 700; line-height: 1.25; margin: 0 0 12px; max-width: 360px; }
+  .auth-art p { position: relative; z-index: 1; font-size: 14px; line-height: 1.55; opacity: .88; max-width: 320px; margin: 0; }
+
+  .auth-form-col { display: flex; align-items: center; justify-content: center; padding: 40px 32px; }
+  .center { max-width: 320px; width: 100%; margin: 0; }
   .center h1 { margin-bottom: 6px; }
   .center p { color: var(--muted); font-size: 14px; margin: 0 0 22px; }
   .field { display: block; margin-bottom: 12px; }
-  .field input { width: 100%; font-size: 15px; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: 11px; outline: none; }
-  .field input:focus { border-color: var(--ink); }
-  .primary { width: 100%; border: none; background: var(--ink); color: #fff; font-size: 15px; font-weight: 600; padding: 13px; border-radius: 11px; cursor: pointer; }
-  .link { background: none; border: none; color: var(--week); cursor: pointer; font-size: 13.5px; text-decoration: underline; margin-top: 14px; display: inline-block; }
+  .field input { width: 100%; font-size: 15px; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: var(--radius-md); outline: none; font-family: var(--font-body); background: var(--card); color: var(--ink); transition: border-color 150ms, box-shadow 150ms; }
+  .field input:focus { border-color: var(--accent); box-shadow: var(--shadow-focus); }
+  .primary { width: 100%; border: none; background: var(--accent); color: #fff; font-size: 15px; font-weight: 700; padding: 13px; border-radius: var(--radius-md); cursor: pointer; font-family: var(--font-body); transition: background 150ms; }
+  .primary:hover { background: var(--accent-dark); }
+  .link { background: none; border: none; color: var(--accent-dark); cursor: pointer; font-size: 13.5px; text-decoration: underline; margin-top: 14px; display: inline-block; font-family: var(--font-body); }
   .msg { font-size: 13px; margin: 12px 0 0; min-height: 18px; }
-  .msg.err { color: #c0392b; }
+  .msg.err { color: var(--error); }
   .msg.ok { color: var(--done); }
-  .setup { max-width: 620px; margin: 60px auto; font-size: 14px; color: #3d4148; }
-  .setup code { background: #F1EFEA; padding: 2px 6px; border-radius: 5px; font-size: 13px; }
+  .setup { max-width: 620px; margin: 60px auto; font-size: 14px; color: var(--muted); }
+  .setup code { background: var(--later-bg); padding: 2px 6px; border-radius: 5px; font-size: 13px; }
   .loading { color: var(--muted); font-size: 14px; padding: 60px 0; text-align: center; }
 </style>
 </head>
@@ -127,6 +157,34 @@ const CHIPS = [
   { b: "depois", label: "Depois", cls: "c-later" },
 ];
 
+function yucaLogo(color, h) {
+  return '<svg class="logo" height="' + h + '" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Yuca">' +
+    '<path d="M 56 32 L 32 32 L 32 86" stroke="' + color + '" stroke-width="7" stroke-linecap="square" fill="none"/>' +
+    '<path d="M 144 168 L 168 168 L 168 114" stroke="' + color + '" stroke-width="7" stroke-linecap="square" fill="none"/>' +
+    '<text x="100" y="92" text-anchor="middle" font-family="Montserrat, Arial, sans-serif" font-size="58" font-weight="700" letter-spacing="2" fill="' + color + '">YU</text>' +
+    '<text x="100" y="148" text-anchor="middle" font-family="Montserrat, Arial, sans-serif" font-size="58" font-weight="700" letter-spacing="2" fill="' + color + '">CA</text>' +
+    '</svg>';
+}
+const LOGO = yucaLogo('#12C68B', 30);
+const LOGO_WHITE = yucaLogo('#FFFFFF', 46);
+
+const ICON_D = {
+  today: 'M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z',
+  week: 'M3 6h18v15H3zM3 6V4a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v2M8 2v4M16 2v4M3 10h18',
+  close: 'M18 6L6 18M6 6l12 12',
+  plus: 'M12 5v14M5 12h14',
+};
+const ICON_EXTRA = {
+  wait: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>',
+  later: '<path d="M3 3h18v4H3z"/><path d="M5 7v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7"/><path d="M10 12h4"/>',
+};
+function icon(name, size, style) {
+  size = size || 15;
+  const inner = ICON_EXTRA[name] || ('<path d="' + ICON_D[name] + '"/>');
+  return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="flex:none;vertical-align:-3px;' + (style || '') + '">' + inner + '</svg>';
+}
+const BUCKET_ICON = { hoje: 'today', semana: 'week', aguardando: 'wait', depois: 'later' };
+
 const root = document.getElementById("root");
 const esc = (s) => (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 let sb = null, tasks = [], userEmail = "";
@@ -150,13 +208,23 @@ function renderAuth(mode) {
   mode = mode || "in";
   const signup = mode === "up";
   root.innerHTML =
-    '<div class="center"><h1>Meu dia <span>· organizador</span></h1>' +
-    "<p>" + (signup ? "Crie seu acesso." : "Entre para ver suas tarefas.") + "</p>" +
-    '<label class="field"><input id="email" type="email" placeholder="e-mail" autocomplete="username" /></label>' +
-    '<label class="field"><input id="pass" type="password" placeholder="senha" autocomplete="current-password" /></label>' +
-    '<button class="primary" id="go">' + (signup ? "Criar acesso" : "Entrar") + "</button>" +
-    '<div class="msg" id="msg"></div>' +
-    '<button class="link" id="swap">' + (signup ? "Já tenho acesso — entrar" : "Primeira vez? Criar acesso") + "</button></div>";
+    '<div class="auth-wrap">' +
+      '<div class="auth-art">' +
+        '<div class="blob blob-1"></div><div class="blob blob-2"></div><div class="blob blob-3"></div>' +
+        '<div class="auth-art-logo">' + LOGO_WHITE + '</div>' +
+        '<h2>Separe captura, priorização e execução.</h2>' +
+        '<p>Um lugar só pra tudo que chega — e um jeito simples de decidir o que importa agora.</p>' +
+      '</div>' +
+      '<div class="auth-form-col"><div class="center">' +
+        '<h1>' + (signup ? "Criar acesso" : "Entrar") + '</h1>' +
+        '<p>' + (signup ? "Crie seu acesso." : "Entre para ver suas tarefas.") + '</p>' +
+        '<label class="field"><input id="email" type="email" placeholder="e-mail" autocomplete="username" /></label>' +
+        '<label class="field"><input id="pass" type="password" placeholder="senha" autocomplete="current-password" /></label>' +
+        '<button class="primary" id="go">' + (signup ? "Criar acesso" : "Entrar") + "</button>" +
+        '<div class="msg" id="msg"></div>' +
+        '<button class="link" id="swap">' + (signup ? "Já tenho acesso — entrar" : "Primeira vez? Criar acesso") + "</button>" +
+      '</div></div>' +
+    '</div>';
 
   document.getElementById("swap").onclick = () => renderAuth(signup ? "in" : "up");
   document.getElementById("go").onclick = doAuth(signup);
@@ -218,18 +286,18 @@ async function clearDone(bucket) {
 function renderApp() {
   const inbox = tasks.filter((t) => t.bucket === "inbox");
   let html =
-    '<header class="top"><h1>Meu dia <span>· organizador</span></h1>' +
+    '<header class="top"><h1>' + LOGO + 'Meu dia <span>· organizador</span></h1>' +
     '<div class="who">' + esc(userEmail) + '<button id="out">sair</button></div></header>' +
     '<div class="date">' + new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" }) + "</div>" +
     '<div class="capture"><input id="capInput" placeholder="Anota qualquer coisa que chegou… (Enter pra capturar)" autocomplete="off" />' +
-    '<button id="capBtn">Capturar</button></div>' +
+    '<button id="capBtn">' + icon('plus', 15) + ' Capturar</button></div>' +
     '<p class="hint">Capturar não é decidir. Joga tudo aqui primeiro e organiza depois.</p>';
 
-  html += '<div class="inbox' + (inbox.length ? "" : " empty") + '"><h2>Caixa de captura (' + inbox.length + ")</h2>";
+  html += '<div class="inbox' + (inbox.length ? "" : " empty") + '"><h2>' + icon('later', 13) + ' Caixa de captura (' + inbox.length + ")</h2>";
   inbox.forEach((t) => {
     html += '<div class="inbox-item"><span class="txt">' + esc(t.text) + '</span><span class="chips">';
     CHIPS.forEach((c) => { html += '<button class="chip ' + c.cls + '" data-move="' + t.id + '" data-to="' + c.b + '">' + c.label + "</button>"; });
-    html += '</span><button class="x" data-del="' + t.id + '" title="descartar">×</button></div>';
+    html += '</span><button class="x" data-del="' + t.id + '" title="descartar">' + icon('close', 13) + '</button></div>';
   });
   html += "</div>";
 
@@ -238,8 +306,8 @@ function renderApp() {
     const items = tasks.filter((t) => t.bucket === b.id);
     const active = items.filter((t) => !t.done).length;
     const hasDone = items.some((t) => t.done);
-    html += '<div class="col" data-b="' + b.id + '"><div class="col-head"><span class="dot d-' + b.id + '"></span>';
-    html += '<span class="col-title">' + b.title + "</span>";
+    html += '<div class="col" data-b="' + b.id + '"><div class="col-head">';
+    html += '<span class="col-title"><span class="bicon bi-' + b.id + '">' + icon(BUCKET_ICON[b.id], 15) + '</span>' + b.title + "</span>";
     let sub = b.sub;
     if (b.id === "hoje") sub = active + "/3" + (active > 3 ? " — foca!" : "");
     html += '<span class="col-sub' + (b.id === "hoje" && active > 3 ? " over" : "") + '">' + sub + "</span></div>";
@@ -248,7 +316,7 @@ function renderApp() {
       html += '<div class="task' + (t.done ? " done" : "") + '" data-id="' + t.id + '"><div class="task-row">';
       html += '<input type="checkbox" class="cb" data-toggle="' + t.id + '"' + (t.done ? " checked" : "") + " />";
       html += '<span class="txt" data-open="' + t.id + '">' + esc(t.text) + "</span>";
-      html += '<button class="x" data-del="' + t.id + '" title="remover">×</button></div><div class="move">';
+      html += '<button class="x" data-del="' + t.id + '" title="remover">' + icon('close', 13) + '</button></div><div class="move">';
       CHIPS.filter((c) => c.b !== b.id).forEach((c) => { html += '<button class="chip ' + c.cls + '" data-move="' + t.id + '" data-to="' + c.b + '">→ ' + c.label + "</button>"; });
       html += "</div></div>";
     });
