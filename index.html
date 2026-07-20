@@ -213,6 +213,8 @@ function fmtDue(iso) { const [, m, d] = iso.split("-"); return d + "/" + m; }
 const root = document.getElementById("root");
 const esc = (s) => (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 let sb = null, tasks = [], userEmail = "";
+const COL_LIMIT = 6;
+let expandedCols = {};
 
 function boot() {
   if (SUPABASE_URL.startsWith("COLE_") || SUPABASE_ANON_KEY.startsWith("COLE_")) {
@@ -344,13 +346,15 @@ function renderApp() {
     const items = tasks.filter((t) => t.bucket === b.id);
     const active = items.filter((t) => !t.done).length;
     const hasDone = items.some((t) => t.done);
+    const expanded = !!expandedCols[b.id];
+    const visible = expanded ? items : items.slice(0, COL_LIMIT);
+    const hidden = items.length - visible.length;
     html += '<div class="col" data-b="' + b.id + '"><div class="col-head">';
     html += '<span class="col-title"><span class="bicon bi-' + b.id + '">' + icon(BUCKET_ICON[b.id], 15) + '</span>' + b.title + "</span>";
-    let sub = b.sub;
-    if (b.id === "hoje") sub = active + "/3" + (active > 3 ? " — foca!" : "");
+    let sub = b.id === "hoje" ? active + "/3" + (active > 3 ? " — foca!" : "") : items.length + " · " + b.sub;
     html += '<span class="col-sub' + (b.id === "hoje" && active > 3 ? " over" : "") + '">' + sub + "</span></div>";
     if (!items.length) html += '<div class="empty-note">vazio</div>';
-    items.forEach((t) => {
+    visible.forEach((t) => {
       const due = t.due_date ? dueStatus(t.due_date) : "";
       html += '<div class="task' + (t.done ? " done" : "") + '" data-id="' + t.id + '"><div class="task-row">';
       html += '<input type="checkbox" class="cb" data-toggle="' + t.id + '"' + (t.done ? " checked" : "") + " />";
@@ -369,6 +373,8 @@ function renderApp() {
       html += '<button class="meta-urgent-btn' + (t.urgent ? " on" : "") + '" data-urgent="' + t.id + '">' + icon('flame', 13) + ' urgente</button>';
       html += "</div></div></div>";
     });
+    if (hidden > 0) html += '<button class="clearbtn" data-more="' + b.id + '">ver mais (' + hidden + ')</button>';
+    else if (expanded && items.length > COL_LIMIT) html += '<button class="clearbtn" data-less="' + b.id + '">ver menos</button>';
     if (hasDone) html += '<button class="clearbtn" data-clear="' + b.id + '">limpar concluídas</button>';
     html += "</div>";
   });
@@ -393,11 +399,15 @@ function renderApp() {
     const delBtn = e.target.closest("[data-del]");
     const clearBtn = e.target.closest("[data-clear]");
     const urgentBtn = e.target.closest("[data-urgent]");
+    const moreBtn = e.target.closest("[data-more]");
+    const lessBtn = e.target.closest("[data-less]");
     const openEl = e.target.closest("[data-open]");
     if (moveBtn) moveTask(moveBtn.dataset.move, moveBtn.dataset.to);
     else if (delBtn) delTask(delBtn.dataset.del);
     else if (clearBtn) clearDone(clearBtn.dataset.clear);
     else if (urgentBtn) { const id = urgentBtn.dataset.urgent; const t = tasks.find((x) => x.id === id); toggleUrgent(id, t && t.urgent); }
+    else if (moreBtn) { expandedCols[moreBtn.dataset.more] = true; renderApp(); }
+    else if (lessBtn) { delete expandedCols[lessBtn.dataset.less]; renderApp(); }
     else if (openEl) { const el = root.querySelector('.task[data-id="' + openEl.dataset.open + '"]'); if (el) el.classList.toggle("open"); }
   });
   root.addEventListener("change", (e) => {
