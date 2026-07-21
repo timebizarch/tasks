@@ -102,15 +102,15 @@
 
   .task { border-top: 1px solid var(--line); padding: 9px 0; }
   .task:first-of-type { border-top: none; }
-  .task-row { display: flex; align-items: flex-start; gap: 9px; }
-  .cb { margin-top: 3px; width: 20px; height: 20px; cursor: pointer; accent-color: var(--done); flex: none; }
+  .task-row { display: flex; align-items: center; gap: 9px; }
+  .cb { width: 20px; height: 20px; cursor: pointer; accent-color: var(--done); flex: none; }
   .task .txt { flex: 1; font-size: 14px; cursor: pointer; }
   .task.done .txt { text-decoration: line-through; color: var(--muted-2); }
   .task .move { display: none; flex-direction: column; gap: 8px; margin: 8px 0 2px 25px; }
   .task.open .move { display: flex; }
   .move-select { align-self: flex-start; font-size: 12.5px; padding: 6px 9px; border: 1px solid var(--line); border-radius: var(--radius-sm); font-family: var(--font-body); background: var(--card); color: var(--ink); }
   .empty-note { color: var(--muted-2); font-size: 12.5px; font-style: italic; padding: 4px 0; }
-  .chev { flex: none; color: var(--muted-2); cursor: pointer; display: inline-flex; transition: transform 150ms; margin-top: 2px; }
+  .chev { flex: none; color: var(--muted-2); cursor: pointer; display: inline-flex; transition: transform 150ms; }
   .task.open .chev { transform: rotate(180deg); }
 
   .tag-urgent { color: var(--error); margin-right: 3px; }
