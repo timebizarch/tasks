@@ -70,10 +70,19 @@
   .x:hover { color: var(--error); }
 
   .filters { display: flex; align-items: center; gap: 8px; margin: 2px 0 18px; flex-wrap: wrap; }
+  .search-input { font-size: 12.5px; padding: 6px 12px; border: 1px solid var(--line); border-radius: var(--radius-pill); font-family: var(--font-body); background: var(--card); color: var(--ink); outline: none; width: 180px; }
+  .search-input:focus { border-color: var(--accent); box-shadow: var(--shadow-focus); }
   .fchip { border: 1px solid var(--line); background: var(--card); border-radius: var(--radius-pill); font-size: 12.5px; padding: 6px 14px; cursor: pointer; font-family: var(--font-body); color: var(--muted); }
   .fchip.on { background: var(--error-bg); border-color: var(--error); color: var(--error); font-weight: 700; }
   .filters select { font-size: 12.5px; padding: 6px 10px; border: 1px solid var(--line); border-radius: var(--radius-pill); font-family: var(--font-body); background: var(--card); color: var(--ink); }
   .fclear { border: none; background: none; color: var(--muted); font-size: 12px; text-decoration: underline; cursor: pointer; font-family: var(--font-body); }
+
+  .week-strip { display: flex; gap: 6px; margin: 0 0 18px; }
+  .week-day { flex: 1; min-width: 0; text-align: center; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-md); padding: 8px 2px; }
+  .week-day.today { border-color: var(--accent); background: var(--accent-lighten); }
+  .wd-label { display: block; font-size: 10px; text-transform: uppercase; color: var(--muted-2); letter-spacing: 0.04em; }
+  .wd-num { display: block; font-size: 15px; font-weight: 700; color: var(--ink); margin-top: 2px; }
+  .wd-count { display: inline-block; margin-top: 4px; background: var(--today); color: #fff; border-radius: var(--radius-pill); font-size: 10.5px; padding: 1px 7px; font-weight: 700; }
 
   .board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
   @media (max-width: 860px) { .board { grid-template-columns: 1fr 1fr; } }
@@ -277,6 +286,22 @@ function todaySummaryHtml() {
   const avg = dias.length ? (dias.reduce((a, b) => a + b, 0) / dias.length).toFixed(1) : null;
   return '<div class="filter-banner">✅ Hoje você já concluiu ' + doneToday.length + (doneToday.length === 1 ? " tarefa" : " tarefas") +
     (avg !== null ? " — média de " + avg + " dias entre criar e terminar." : ".") + "</div>";
+}
+function weekStripHtml() {
+  const days = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + i);
+    const iso = d.toISOString().slice(0, 10);
+    const count = tasks.filter((t) => !t.done && t.due_date === iso).length;
+    days.push({ label: d.toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", ""), num: d.getDate(), count: count, isToday: i === 0 });
+  }
+  return '<div class="week-strip">' + days.map((d) =>
+    '<div class="week-day' + (d.isToday ? " today" : "") + '">' +
+      '<span class="wd-label">' + esc(d.label) + '</span>' +
+      '<span class="wd-num">' + d.num + '</span>' +
+      (d.count ? '<span class="wd-count">' + d.count + '</span>' : '') +
+    "</div>"
+  ).join("") + "</div>";
 }
 const HISTORY_LIMIT = 15;
 function slaByArea(list) {
@@ -651,7 +676,9 @@ function renderApp() {
   html += "</div>";
 
   const filterOn = filters.urgent || filters.overdue || filters.area;
+  const searchOn = searchQuery.trim() !== "";
   html += '<div class="filters">';
+  html += '<input type="text" id="searchInput" class="search-input" placeholder="🔎 buscar tarefa…" value="' + esc(searchQuery) + '" />';
   html += '<button class="fchip' + (filters.urgent ? " on" : "") + '" data-ffilter="urgent">' + icon('flame', 13) + ' Urgentes</button>';
   html += '<button class="fchip' + (filters.overdue ? " on" : "") + '" data-ffilter="overdue">' + icon('week', 13) + ' Atrasadas</button>';
   html += '<select data-farea><option value="">Todas as áreas</option><option value="__none__"' + (filters.area === "__none__" ? " selected" : "") + '>Sem área</option>';
@@ -673,6 +700,8 @@ function renderApp() {
     justPromoted = 0;
   }
 
+  html += weekStripHtml();
+
   html += '<div class="board">';
   BUCKETS.forEach((b) => {
     let items = tasks.filter((t) => t.bucket === b.id && !t.cleared_at);
@@ -682,6 +711,10 @@ function renderApp() {
     if (filters.overdue) items = items.filter((t) => !t.done && t.due_date && dueStatus(t.due_date) === "overdue");
     if (filters.area === "__none__") items = items.filter((t) => !t.area);
     else if (filters.area) items = items.filter((t) => sameArea(t.area, filters.area));
+    if (searchOn) {
+      const q = stripAccents(searchQuery.trim().toLowerCase());
+      items = items.filter((t) => stripAccents((t.text || "").toLowerCase()).includes(q));
+    }
     items = items.slice().sort(cmpTask);
     const expanded = !!expandedCols[b.id];
     const visible = expanded ? items : items.slice(0, COL_LIMIT);
@@ -691,7 +724,7 @@ function renderApp() {
     let sub = b.id === "hoje" ? active + "/3" + (active > 3 ? " — foca!" : "") : items.length + " · " + b.sub;
     html += '<span class="col-sub' + (b.id === "hoje" && active > 3 ? " over" : "") + '">' + sub + "</span></div>";
     if (b.id === "hoje" && active > 3) html += '<div class="limit-banner">Mais de 3 em Hoje — considera mover alguma pra Esta semana.</div>';
-    if (!items.length) html += '<div class="empty-note">' + (filterOn ? "nenhuma com esse filtro" : b.emptyMsg) + "</div>";
+    if (!items.length) html += '<div class="empty-note">' + (filterOn || searchOn ? "nenhuma com esse filtro" : b.emptyMsg) + "</div>";
     visible.forEach((t) => {
       const due = t.due_date ? dueStatus(t.due_date) : "";
       html += '<div class="task' + (t.done ? " done" : "") + '" data-id="' + t.id + '"><div class="task-row">';
@@ -785,6 +818,20 @@ function renderApp() {
     refocusCapture = false;
     const ci = document.getElementById("capInput");
     if (ci) ci.focus();
+  }
+
+  const searchEl = document.getElementById("searchInput");
+  if (searchEl) {
+    searchEl.addEventListener("input", (e) => {
+      searchQuery = e.target.value;
+      refocusSearch = true;
+      renderApp();
+    });
+    if (refocusSearch) {
+      refocusSearch = false;
+      searchEl.focus();
+      searchEl.setSelectionRange(searchEl.value.length, searchEl.value.length);
+    }
   }
 
   const methodEl = document.querySelector("details.method");
