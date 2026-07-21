@@ -172,6 +172,13 @@
   .setup { max-width: 620px; margin: 60px auto; font-size: 14px; color: var(--muted); }
   .setup code { background: var(--later-bg); padding: 2px 6px; border-radius: 5px; font-size: 13px; }
   .loading { color: var(--muted); font-size: 14px; padding: 60px 0; text-align: center; }
+
+  .confetti-bit { position: fixed; width: 7px; height: 7px; border-radius: 2px; pointer-events: none; z-index: 999;
+    animation: confetti-burst 750ms ease-out forwards; }
+  @keyframes confetti-burst {
+    0% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+    100% { transform: translate(var(--dx), var(--dy)) rotate(var(--rot)); opacity: 0; }
+  }
 </style>
 </head>
 <body>
@@ -361,6 +368,36 @@ function cmpTask(a, b) {
 
 const root = document.getElementById("root");
 const esc = (s) => (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+/* Comemoração ao concluir: sempre nas urgentes, ~1 em 3 nas normais
+   (reforço variável mantém o efeito surpresa em vez de cansar). */
+const CONFETTI_COLORS = ["#CE6363", "#07C1D6", "#7B17A2", "#12C68B"];
+function celebrate(x, y) {
+  const n = 14;
+  for (let i = 0; i < n; i++) {
+    const p = document.createElement("div");
+    p.className = "confetti-bit";
+    const angle = (Math.PI * 2 * i) / n + (i % 2 ? 0.15 : -0.15);
+    const dist = 40 + (i % 3) * 22;
+    const dx = Math.cos(angle) * dist;
+    const dy = Math.sin(angle) * dist - 30;
+    p.style.left = x + "px";
+    p.style.top = y + "px";
+    p.style.setProperty("--dx", dx + "px");
+    p.style.setProperty("--dy", dy + "px");
+    p.style.setProperty("--rot", Math.round(Math.random() * 360) + "deg");
+    p.style.background = CONFETTI_COLORS[i % CONFETTI_COLORS.length];
+    document.body.appendChild(p);
+    setTimeout(() => p.remove(), 800);
+  }
+}
+function maybeCelebrate(checkboxEl, task) {
+  if (!task) return;
+  const shouldCelebrate = task.urgent || Math.random() < 1 / 3;
+  if (!shouldCelebrate) return;
+  const r = checkboxEl.getBoundingClientRect();
+  celebrate(r.left + r.width / 2, r.top + r.height / 2);
+}
 let sb = null, tasks = [], userEmail = "";
 const COL_LIMIT = 6;
 let expandedCols = {};
@@ -728,7 +765,12 @@ root.addEventListener("click", (e) => {
   else if (openEl) { const el = root.querySelector('.task[data-id="' + openEl.dataset.open + '"]'); if (el) el.classList.toggle("open"); }
 });
 root.addEventListener("change", (e) => {
-  if (e.target.dataset.toggle) toggleTask(e.target.dataset.toggle, e.target.checked);
+  if (e.target.dataset.toggle) {
+    const id = e.target.dataset.toggle;
+    const checked = e.target.checked;
+    if (checked) maybeCelebrate(e.target, tasks.find((x) => x.id === id));
+    toggleTask(id, checked);
+  }
   else if (e.target.dataset.due) updateDue(e.target.dataset.due, e.target.value);
   else if (e.target.dataset.moveto) { if (e.target.value) moveTask(e.target.dataset.moveto, e.target.value); }
   else if (e.target.dataset.farea !== undefined) { filters.area = e.target.value; renderApp(); }
