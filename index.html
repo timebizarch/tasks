@@ -116,6 +116,7 @@
   .tag-due-today { background: var(--alert-bg); color: var(--alert); font-weight: 600; }
   .tag-due-overdue { background: var(--overdue-bg); color: var(--overdue); font-weight: 700; }
   .tag-wait { background: var(--wait-bg); color: var(--wait); font-weight: 600; }
+  .tag-wait-stale { background: var(--overdue-bg); color: var(--overdue); }
   .tag-source { display: inline-flex; align-items: center; gap: 3px; margin-right: 5px; background: var(--later-bg); color: var(--muted-2); border-radius: var(--radius-pill); font-size: 10.5px; padding: 2px 7px 2px 5px; white-space: nowrap; }
 
   .limit-banner { background: var(--today-bg); color: var(--today); border-radius: var(--radius-sm); font-size: 11.5px; font-weight: 600; padding: 6px 9px; margin-bottom: 10px; }
@@ -357,16 +358,24 @@ function historyHtml(list) {
    "texto | área | até terça"  ->  área + prazo já preenchidos
    "texto, urgente, até terça" (sem |) -> detecta "urgente" e "até <dia/data>" na frase */
 const WEEKDAY_MAP = { domingo: 0, segunda: 1, terca: 2, quarta: 3, quinta: 4, sexta: 5, sabado: 6 };
+// Sinônimos de "urgente" e de frases de prazo além dos dias da semana.
+const URGENT_RE = /\b(urgente|priorit[aá]rio|prioridade|importante|cr[ií]tico)\b/i;
 function stripAccents(s) { return s.normalize("NFD").replace(new RegExp("[\\u0300-\\u036f]", "g"), ""); }
 function nextDateForWeekday(dow) {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const diff = (dow - today.getDay() + 7) % 7;
   return new Date(today.getTime() + diff * 86400000).toISOString().slice(0, 10);
 }
+function endOfMonthIso() {
+  const d = new Date();
+  return new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().slice(0, 10);
+}
 function parseDuePhrase(phrase) {
   const p = stripAccents(phrase.trim().toLowerCase());
   if (/\bhoje\b/.test(p)) return new Date().toISOString().slice(0, 10);
   if (/\bamanha\b/.test(p)) return new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  if (/\b(semana que vem|proxima semana)\b/.test(p)) return new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+  if (/\b(fim|final) do mes\b/.test(p)) return endOfMonthIso();
   const dm = p.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/);
   if (dm) {
     const day = dm[1].padStart(2, "0"), month = dm[2].padStart(2, "0");
@@ -383,16 +392,16 @@ function smartParse(raw) {
     const parts = text.split("|").map((s) => s.trim()).filter(Boolean);
     text = parts.shift() || text;
     parts.forEach((p) => {
-      if (/\burgente\b/i.test(stripAccents(p))) { urgent = true; return; }
+      if (URGENT_RE.test(stripAccents(p))) { urgent = true; return; }
       const d = parseDuePhrase(p);
       if (d) { due_date = d; return; }
       if (!area) area = p;
     });
   } else {
-    if (/\burgente\b/i.test(stripAccents(text))) { urgent = true; text = text.replace(/\burgente\b/gi, ""); }
+    if (URGENT_RE.test(stripAccents(text))) { urgent = true; text = text.replace(URGENT_RE, ""); }
     // Só reconhece "até <palavra de data>" — não engole o resto da frase depois do prazo.
-    const DATE_WORD = "(?:hoje|amanh[ãa]|domingo|segunda(?:-feira)?|ter[çc]a(?:-feira)?|quarta(?:-feira)?|quinta(?:-feira)?|sexta(?:-feira)?|s[áa]bado|\\d{1,2}\\/\\d{1,2}(?:\\/\\d{2,4})?)";
-    const m = text.match(new RegExp("\\bat[ée]\\s+" + DATE_WORD + "\\b", "i")) || text.match(/\b(hoje|amanh[ãa])\b/i);
+    const DATE_WORD = "(?:hoje|amanh[ãa]|semana que vem|pr[oó]xima semana|fim do m[eê]s|final do m[eê]s|domingo|segunda(?:-feira)?|ter[çc]a(?:-feira)?|quarta(?:-feira)?|quinta(?:-feira)?|sexta(?:-feira)?|s[áa]bado|\\d{1,2}\\/\\d{1,2}(?:\\/\\d{2,4})?)";
+    const m = text.match(new RegExp("\\bat[ée]\\s+" + DATE_WORD + "\\b", "i")) || text.match(/\b(hoje|amanh[ãa]|semana que vem|pr[oó]xima semana|fim do m[eê]s|final do m[eê]s)\b/i);
     if (m) { const d = parseDuePhrase(m[0]); if (d) { due_date = d; text = text.replace(m[0], ""); } }
     text = text.replace(/\s*,\s*,/g, ",").replace(/,\s*$/, "").replace(/^\s*,\s*/, "").replace(/\s{2,}/g, " ").trim();
   }
@@ -405,6 +414,17 @@ function cmpTask(a, b) {
   const ad = a.due_date || "￿", bd = b.due_date || "￿";
   if (ad !== bd) return ad < bd ? -1 : 1;
   return 0;
+}
+function normText(s) { return stripAccents((s || "").trim().toLowerCase()).replace(/\s+/g, " "); }
+function findSimilarTask(text) {
+  const norm = normText(text);
+  if (!norm) return null;
+  return tasks.find((t) => {
+    if (t.done || t.cleared_at) return false;
+    const tn = normText(t.text);
+    if (!tn) return false;
+    return tn === norm || tn.includes(norm) || norm.includes(tn);
+  }) || null;
 }
 
 const root = document.getElementById("root");
@@ -733,7 +753,16 @@ function renderApp() {
       html += esc(t.text);
       if (t.area) html += '<span class="tag-area">' + esc(t.area) + '</span>';
       if (t.due_date) html += '<span class="tag-due' + (due ? " tag-due-" + due : "") + '">' + fmtDue(t.due_date) + '</span>';
-      if (t.waiting_on) html += '<span class="tag-wait">' + icon('wait', 12) + ' ' + esc(t.waiting_on) + '</span>';
+      if (b.id === "aguardando" && !t.done) {
+        const daysWaiting = daysBetween(t.created_at, new Date().toISOString().slice(0, 10));
+        const stale = daysWaiting !== null && daysWaiting >= 5;
+        const waitParts = [];
+        if (t.waiting_on) waitParts.push(esc(t.waiting_on));
+        if (daysWaiting !== null) waitParts.push("há " + daysWaiting + (daysWaiting === 1 ? " dia" : " dias"));
+        if (waitParts.length) html += '<span class="tag-wait' + (stale ? " tag-wait-stale" : "") + '">' + icon('wait', 12) + ' ' + waitParts.join(" · ") + '</span>';
+      } else if (t.waiting_on) {
+        html += '<span class="tag-wait">' + icon('wait', 12) + ' ' + esc(t.waiting_on) + '</span>';
+      }
       html += "</span>";
       html += '<span class="chev" data-open="' + t.id + '">' + icon('chevron', 14) + '</span>';
       html += '<button class="x" data-del="' + t.id + '" title="remover">' + icon('close', 13) + '</button></div><div class="move">';
@@ -799,6 +828,8 @@ function renderApp() {
     const el = document.getElementById("capInput");
     const v = el.value.trim();
     if (!v || capturing) return;
+    const similar = findSimilarTask(smartParse(v).text);
+    if (similar && !confirm('Já tem algo parecido: "' + similar.text + '". Capturar mesmo assim?')) return;
     capturing = true;
     refocusCapture = true;
     el.value = "";
