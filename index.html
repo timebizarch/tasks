@@ -445,6 +445,7 @@ function maybeCelebrate(task) {
 let sb = null, tasks = [], userEmail = "";
 const COL_LIMIT = 6;
 let expandedCols = {};
+let openTasks = {}; // tarefas com o painel expandido — precisa sobreviver a re-renders
 let filters = { urgent: false, overdue: false, area: "" };
 let refocusCapture = false;
 let capturing = false;
@@ -727,7 +728,7 @@ function renderApp() {
     if (!items.length) html += '<div class="empty-note">' + (filterOn || searchOn ? "nenhuma com esse filtro" : b.emptyMsg) + "</div>";
     visible.forEach((t) => {
       const due = t.due_date ? dueStatus(t.due_date) : "";
-      html += '<div class="task' + (t.done ? " done" : "") + '" data-id="' + t.id + '"><div class="task-row">';
+      html += '<div class="task' + (t.done ? " done" : "") + (openTasks[t.id] ? " open" : "") + '" data-id="' + t.id + '"><div class="task-row">';
       html += '<input type="checkbox" class="cb" data-toggle="' + t.id + '"' + (t.done ? " checked" : "") + " />";
       html += '<span class="txt" data-open="' + t.id + '">';
       if (t.source === "slack") html += '<span class="tag-source" title="Capturada pelo Slack">' + icon('message', 11) + ' Slack</span>';
@@ -873,7 +874,7 @@ root.addEventListener("click", (e) => {
   else if (lessBtn) { delete expandedCols[lessBtn.dataset.less]; renderApp(); }
   else if (ffilterBtn) { const k = ffilterBtn.dataset.ffilter; filters[k] = !filters[k]; renderApp(); }
   else if (fclearBtn) { filters = { urgent: false, overdue: false, area: "" }; renderApp(); }
-  else if (openEl) { const el = root.querySelector('.task[data-id="' + openEl.dataset.open + '"]'); if (el) el.classList.toggle("open"); }
+  else if (openEl) { const id = openEl.dataset.open; openTasks[id] = !openTasks[id]; renderApp(); }
 });
 root.addEventListener("change", (e) => {
   if (e.target.dataset.toggle) {
