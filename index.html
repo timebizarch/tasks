@@ -11,15 +11,17 @@
 <style>
   :root {
     /* Yuca brand tokens — Manual de Marca Yuca */
-    --paper: #FDFAF7; --card: #FFFFFF; --ink: #062840; --muted: #425158; --muted-2: #8E9BA1;
+    --paper: #FDFAF7; --card: #FFFFFF; --ink: #062840; --muted: #425158; --muted-2: #5B6570;
     --line: #DDE1E3; --line-strong: #BBC3C7; --done: #13C081;
     --accent: #12C68B; --accent-dark: #098C7B; --accent-lighten: #F2FBF7;
+    --link: #076B5A;
     --today: #CE6363; --today-bg: #FEF5F5;
     --week: #07C1D6; --week-bg: #EEF7FB;
     --wait: #7B17A2; --wait-bg: #FDFAFF;
     --later: #8E9BA1; --later-bg: #F4F5F6;
-    --error: #D1436E; --error-bg: #FDF4F4;
-    --alert: #B4790A; --alert-bg: #FFFAF1;
+    --error: #B8265A; --error-bg: #FDF4F4;
+    --alert: #8A5A05; --alert-bg: #FFFAF1;
+    --overdue: #B23A0E; --overdue-bg: #FDF1EA;
     --radius-sm: 8px; --radius-md: 12px; --radius-lg: 16px; --radius-xl: 24px; --radius-pill: 999px;
     --shadow-sm: 0 2px 6px rgba(16,36,54,.06), 0 1px 2px rgba(16,36,54,.04);
     --shadow-md: 0 6px 16px rgba(16,36,54,.08), 0 2px 4px rgba(16,36,54,.04);
@@ -38,14 +40,14 @@
   h1 .logo { flex: none; }
   h1 span { color: var(--muted); font-weight: 500; font-size: 0.8em; }
   .who { color: var(--muted); font-size: 13px; }
-  .who button { border: none; background: none; color: var(--accent-dark); cursor: pointer; font-size: 13px; text-decoration: underline; padding: 0 0 0 8px; }
+  .who button { border: none; background: none; color: var(--link); cursor: pointer; font-size: 13px; text-decoration: underline; padding: 0 0 0 8px; }
   .date { color: var(--muted); font-size: 13px; text-transform: capitalize; margin-bottom: 20px; }
 
   .capture { display: flex; gap: 8px; margin-bottom: 6px; }
   .capture input { flex: 1; font-size: 15px; padding: 13px 15px; border: 1.5px solid var(--line); border-radius: var(--radius-md); background: var(--card); color: var(--ink); outline: none; font-family: var(--font-body); transition: border-color 150ms, box-shadow 150ms; }
   .capture input:focus { border-color: var(--accent); box-shadow: var(--shadow-focus); }
-  .capture button { border: none; background: var(--accent); color: #fff; font-size: 14px; font-weight: 700; padding: 0 20px; border-radius: var(--radius-md); cursor: pointer; font-family: var(--font-body); transition: background 150ms; }
-  .capture button:hover { background: var(--accent-dark); }
+  .capture button { border: none; background: var(--accent-dark); color: #fff; font-size: 14px; font-weight: 700; padding: 0 20px; border-radius: var(--radius-md); cursor: pointer; font-family: var(--font-body); transition: filter 150ms; }
+  .capture button:hover { filter: brightness(0.88); }
   .hint { color: var(--muted); font-size: 12.5px; margin: 0 2px 20px; }
 
   .inbox { background: var(--card); border: 1.5px dashed var(--line-strong); border-radius: var(--radius-lg); padding: 14px 16px; margin-bottom: 22px; }
@@ -61,7 +63,7 @@
   .chip.c-week:hover { background: var(--week-bg); border-color: var(--week); }
   .chip.c-wait:hover { background: var(--wait-bg); border-color: var(--wait); }
   .chip.c-later:hover { background: var(--later-bg); border-color: var(--later); }
-  .x { border: none; background: none; color: var(--muted-2); cursor: pointer; font-size: 17px; line-height: 1; padding: 2px 4px; }
+  .x { border: none; background: none; color: var(--muted-2); cursor: pointer; font-size: 17px; line-height: 1; padding: 6px 7px; }
   .x:hover { color: var(--error); }
 
   .filters { display: flex; align-items: center; gap: 8px; margin: 2px 0 18px; flex-wrap: wrap; }
@@ -89,7 +91,7 @@
   .task { border-top: 1px solid var(--line); padding: 9px 0; }
   .task:first-of-type { border-top: none; }
   .task-row { display: flex; align-items: flex-start; gap: 9px; }
-  .cb { margin-top: 3px; width: 16px; height: 16px; cursor: pointer; accent-color: var(--done); flex: none; }
+  .cb { margin-top: 3px; width: 20px; height: 20px; cursor: pointer; accent-color: var(--done); flex: none; }
   .task .txt { flex: 1; font-size: 14px; cursor: pointer; }
   .task.done .txt { text-decoration: line-through; color: var(--muted-2); }
   .task .move { display: none; flex-direction: column; gap: 8px; margin: 8px 0 2px 25px; }
@@ -102,7 +104,7 @@
   .tag-urgent { color: var(--error); margin-right: 3px; }
   .tag-area, .tag-due { font-size: 11px; padding: 2px 8px; border-radius: var(--radius-pill); margin-left: 6px; background: var(--later-bg); color: var(--muted); white-space: nowrap; }
   .tag-due-today { background: var(--alert-bg); color: var(--alert); font-weight: 600; }
-  .tag-due-overdue { background: var(--error-bg); color: var(--error); font-weight: 700; }
+  .tag-due-overdue { background: var(--overdue-bg); color: var(--overdue); font-weight: 700; }
 
   .meta-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
   .meta-row input { font-size: 12.5px; padding: 6px 9px; border: 1px solid var(--line); border-radius: var(--radius-sm); font-family: var(--font-body); background: var(--card); color: var(--ink); outline: none; }
@@ -117,7 +119,7 @@
   details.method { margin-top: 30px; border: 1.5px solid var(--line); border-radius: var(--radius-lg); background: var(--card); padding: 4px 18px; }
   details.method summary { cursor: pointer; font-size: 13px; font-weight: 700; padding: 12px 0; list-style: none; }
   details.method summary::-webkit-details-marker { display: none; }
-  details.method summary::before { content: "▸ "; color: var(--accent-dark); }
+  details.method summary::before { content: "▸ "; color: var(--link); }
   details.method[open] summary::before { content: "▾ "; }
   .method-body { font-size: 13.5px; color: var(--muted); padding-bottom: 16px; }
   .method-body b { color: var(--ink); }
@@ -143,9 +145,9 @@
   .field { display: block; margin-bottom: 12px; }
   .field input { width: 100%; font-size: 15px; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: var(--radius-md); outline: none; font-family: var(--font-body); background: var(--card); color: var(--ink); transition: border-color 150ms, box-shadow 150ms; }
   .field input:focus { border-color: var(--accent); box-shadow: var(--shadow-focus); }
-  .primary { width: 100%; border: none; background: var(--accent); color: #fff; font-size: 15px; font-weight: 700; padding: 13px; border-radius: var(--radius-md); cursor: pointer; font-family: var(--font-body); transition: background 150ms; }
-  .primary:hover { background: var(--accent-dark); }
-  .link { background: none; border: none; color: var(--accent-dark); cursor: pointer; font-size: 13.5px; text-decoration: underline; margin-top: 14px; display: inline-block; font-family: var(--font-body); }
+  .primary { width: 100%; border: none; background: var(--accent-dark); color: #fff; font-size: 15px; font-weight: 700; padding: 13px; border-radius: var(--radius-md); cursor: pointer; font-family: var(--font-body); transition: filter 150ms; }
+  .primary:hover { filter: brightness(0.88); }
+  .link { background: none; border: none; color: var(--link); cursor: pointer; font-size: 13.5px; text-decoration: underline; margin-top: 14px; display: inline-block; font-family: var(--font-body); }
   .msg { font-size: 13px; margin: 12px 0 0; min-height: 18px; }
   .msg.err { color: var(--error); }
   .msg.ok { color: var(--done); }
