@@ -47,8 +47,6 @@
   .capture { display: flex; gap: 8px; margin-bottom: 6px; }
   .capture input { flex: 1; font-size: 15px; padding: 13px 15px; border: 1.5px solid var(--line); border-radius: var(--radius-md); background: var(--card); color: var(--ink); outline: none; font-family: var(--font-body); transition: border-color 150ms, box-shadow 150ms; }
   .capture input:focus { border-color: var(--accent); box-shadow: var(--shadow-focus); }
-  .capture input[type="date"] { flex: none; width: 132px; font-size: 13.5px; padding: 0 10px; }
-  .capture .meta-urgent-btn { flex: none; padding: 0 13px; }
   .capture button { border: none; background: var(--accent-dark); color: #fff; font-size: 14px; font-weight: 700; padding: 0 20px; border-radius: var(--radius-md); cursor: pointer; font-family: var(--font-body); transition: filter 150ms; }
   .capture button:hover { filter: brightness(0.88); }
   .hint { color: var(--muted); font-size: 12.5px; margin: 0 2px 20px; }
@@ -245,6 +243,8 @@ const ICON_D = {
   plus: 'M12 5v14M5 12h14',
   flame: 'M12 2c1 3-1.5 4.5-3 7-1 1.7-1.5 3-1.5 4.5a4.5 4.5 0 0 0 9 0c0-1.8-.7-3-1.8-4.3.1 1.6-.6 2.5-1.5 2.5-1.2 0-1.7-1-1.2-2.2C13 7.5 12.5 4.5 12 2z',
   chevron: 'M6 9l6 6 6-6',
+  check: 'M20 6 9 17l-5-5',
+  search: 'M21 21l-4.35-4.35M11 19a8 8 0 1 1 0-16 8 8 0 0 1 0 16Z',
   message: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z',
 };
 const ICON_EXTRA = {
@@ -284,7 +284,7 @@ function todaySummaryHtml() {
   if (!doneToday.length) return "";
   const dias = doneToday.map((t) => daysBetween(t.created_at, t.done_at)).filter((d) => d !== null);
   const avg = dias.length ? (dias.reduce((a, b) => a + b, 0) / dias.length).toFixed(1) : null;
-  return '<div class="filter-banner">✅ Hoje você já concluiu ' + doneToday.length + (doneToday.length === 1 ? " tarefa" : " tarefas") +
+  return '<div class="filter-banner">' + icon('check', 13) + ' Hoje você já concluiu ' + doneToday.length + (doneToday.length === 1 ? " tarefa" : " tarefas") +
     (avg !== null ? " — média de " + avg + " dias entre criar e terminar." : ".") + "</div>";
 }
 function weekStripHtml() {
@@ -292,7 +292,10 @@ function weekStripHtml() {
   for (let i = 0; i < 7; i++) {
     const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + i);
     const iso = d.toISOString().slice(0, 10);
-    const count = tasks.filter((t) => !t.done && t.due_date === iso).length;
+    // "hoje" acumula tudo que já venceu (atrasadas não somem da tirinha ao virar o dia).
+    const count = i === 0
+      ? tasks.filter((t) => !t.done && t.due_date && t.due_date <= iso).length
+      : tasks.filter((t) => !t.done && t.due_date === iso).length;
     days.push({ label: d.toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", ""), num: d.getDate(), count: count, isToday: i === 0 });
   }
   return '<div class="week-strip">' + days.map((d) =>
@@ -450,8 +453,6 @@ let filters = { urgent: false, overdue: false, area: "" };
 let refocusCapture = false;
 let capturing = false;
 let methodOpen = null; // null = ainda não decidido nesta sessão
-let quickUrgent = false;
-let quickDue = "";
 let searchQuery = "";
 let refocusSearch = false;
 
@@ -569,13 +570,11 @@ async function loadAndRender(quiet) {
   await autoPromoteOverdue();
   renderApp();
 }
-async function addTask(raw, overrides) {
+async function addTask(raw) {
   const p = smartParse(raw);
-  const urgent = (overrides && overrides.urgent) || p.urgent;
-  const due_date = (overrides && overrides.due_date) || p.due_date;
   const { error } = await sb.from("tasks").insert({
     text: p.text, bucket: "inbox", done: false,
-    area: p.area, urgent: urgent, due_date: due_date,
+    area: p.area, urgent: p.urgent, due_date: p.due_date,
   });
   if (error) { reportError("capturar a tarefa", error); return; }
   loadAndRender(true);
@@ -650,11 +649,9 @@ function renderApp() {
     '<div class="date">' + new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" }) + "</div>" +
     todaySummaryHtml() +
     '<div class="capture"><input id="capInput" placeholder="Anota qualquer coisa que chegou… (Enter pra capturar, / foca aqui)" autocomplete="off" />' +
-    '<button id="capUrgent" class="meta-urgent-btn' + (quickUrgent ? " on" : "") + '" title="marcar urgente">' + icon('flame', 13) + '</button>' +
-    '<input type="date" id="capDue" value="' + esc(quickDue) + '" title="prazo" />' +
     '<button id="capBtn">' + icon('plus', 15) + ' Capturar</button></div>' +
     '<p class="hint">Capturar não é decidir. Joga tudo aqui primeiro e organiza depois. ' +
-    'Dica: "tarefa | área | até terça" ou "tarefa, urgente, até sexta" já preenchem área/prazo/urgência — ou usa os botões 🔥/📅 ao lado.</p>';
+    'Dica: "tarefa | área | até terça" ou "tarefa, urgente, até sexta" já preenchem área/prazo/urgência.</p>';
 
   const inboxExpanded = !!expandedCols.__inbox__;
   const inboxVisible = inboxExpanded ? inbox : inbox.slice(0, COL_LIMIT);
@@ -679,7 +676,7 @@ function renderApp() {
   const filterOn = filters.urgent || filters.overdue || filters.area;
   const searchOn = searchQuery.trim() !== "";
   html += '<div class="filters">';
-  html += '<input type="text" id="searchInput" class="search-input" placeholder="🔎 buscar tarefa…" value="' + esc(searchQuery) + '" />';
+  html += '<input type="text" id="searchInput" class="search-input" placeholder="buscar tarefa…" value="' + esc(searchQuery) + '" />';
   html += '<button class="fchip' + (filters.urgent ? " on" : "") + '" data-ffilter="urgent">' + icon('flame', 13) + ' Urgentes</button>';
   html += '<button class="fchip' + (filters.overdue ? " on" : "") + '" data-ffilter="overdue">' + icon('week', 13) + ' Atrasadas</button>';
   html += '<select data-farea><option value="">Todas as áreas</option><option value="__none__"' + (filters.area === "__none__" ? " selected" : "") + '>Sem área</option>';
@@ -694,10 +691,10 @@ function renderApp() {
     if (filters.overdue) parts.push("atrasadas");
     if (filters.area === "__none__") parts.push("sem área");
     else if (filters.area) parts.push('da área "' + esc(filters.area) + '"');
-    html += '<div class="filter-banner">🔎 Mostrando só: ' + parts.join(" + ") + ". Outras tarefas continuam salvas, só estão escondidas.</div>";
+    html += '<div class="filter-banner">' + icon('search', 12) + ' Mostrando só: ' + parts.join(" + ") + ". Outras tarefas continuam salvas, só estão escondidas.</div>";
   }
   if (justPromoted > 0) {
-    html += '<div class="filter-banner">⏰ ' + justPromoted + (justPromoted === 1 ? " tarefa venceu e foi movida" : " tarefas venceram e foram movidas") + ' pra Hoje automaticamente.</div>';
+    html += '<div class="filter-banner">' + icon('wait', 13) + ' ' + justPromoted + (justPromoted === 1 ? " tarefa venceu e foi movida" : " tarefas venceram e foram movidas") + ' pra Hoje automaticamente.</div>';
     justPromoted = 0;
   }
 
@@ -736,7 +733,7 @@ function renderApp() {
       html += esc(t.text);
       if (t.area) html += '<span class="tag-area">' + esc(t.area) + '</span>';
       if (t.due_date) html += '<span class="tag-due' + (due ? " tag-due-" + due : "") + '">' + fmtDue(t.due_date) + '</span>';
-      if (t.waiting_on) html += '<span class="tag-wait">⏳ ' + esc(t.waiting_on) + '</span>';
+      if (t.waiting_on) html += '<span class="tag-wait">' + icon('wait', 12) + ' ' + esc(t.waiting_on) + '</span>';
       html += "</span>";
       html += '<span class="chev" data-open="' + t.id + '">' + icon('chevron', 14) + '</span>';
       html += '<button class="x" data-del="' + t.id + '" title="remover">' + icon('close', 13) + '</button></div><div class="move">';
@@ -804,16 +801,11 @@ function renderApp() {
     if (!v || capturing) return;
     capturing = true;
     refocusCapture = true;
-    const overrides = { urgent: quickUrgent, due_date: quickDue || null };
-    quickUrgent = false;
-    quickDue = "";
     el.value = "";
-    try { await addTask(v, overrides); } finally { capturing = false; }
+    try { await addTask(v); } finally { capturing = false; }
   };
   document.getElementById("capBtn").onclick = cap;
   document.getElementById("capInput").addEventListener("keydown", (e) => { if (e.key === "Enter") cap(); });
-  document.getElementById("capUrgent").onclick = () => { quickUrgent = !quickUrgent; renderApp(); };
-  document.getElementById("capDue").onchange = (e) => { quickDue = e.target.value; };
 
   if (refocusCapture) {
     refocusCapture = false;
