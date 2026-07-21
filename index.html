@@ -127,7 +127,13 @@
   details.method[open] summary::before { content: "▾ "; }
   .method-body { font-size: 13.5px; color: var(--muted); padding-bottom: 16px; }
   .method-body b { color: var(--ink); }
-  .method-body p { margin: 0 0 10px; }
+  .method-body p { margin: 0 0 8px; }
+  .method-kicker { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; color: var(--accent-dark); margin: 18px 0 6px !important; }
+  .method-kicker:first-child { margin-top: 2px !important; }
+  .method-body ol, .method-body ul { margin: 0 0 6px; padding-left: 20px; }
+  .method-body li { margin-bottom: 5px; }
+  .method-rule { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+  .method-rule span { background: var(--later-bg); border-radius: var(--radius-sm); padding: 6px 12px; font-size: 12.5px; }
 
   .auth-wrap { display: grid; grid-template-columns: 1.05fr 1fr; min-height: 560px; border-radius: var(--radius-xl); overflow: hidden; box-shadow: var(--shadow-lg); background: var(--card); margin-top: 16px; }
   @media (max-width: 760px) { .auth-wrap { grid-template-columns: 1fr; min-height: auto; margin-top: 0; } }
@@ -549,9 +555,30 @@ function renderApp() {
   }
   html +=
     '<details class="method"' + (methodOpen ? " open" : "") + '><summary>Como usar (o método)</summary><div class="method-body">' +
-    "<p><b>Ritual diário (10 min):</b> esvazia a captura, escolhe até 3 chave pro Hoje, distribui o resto. No fim do dia, limpa as concluídas.</p>" +
-    "<p><b>Ritual semanal (segunda):</b> zera a captura, revê o Aguardando e cobra quem precisa, quebra as de Esta semana em próximos passos.</p>" +
-    '<p><b>Priorização, na dúvida:</b> move uma meta da semana / do Feirão? tem prazo real? tem alguém bloqueado te esperando? Dois "sim" = Hoje. Um = Semana. Nenhum = Depois.</p>' +
+    '<p class="method-kicker">Todo dia (10 min)</p>' +
+    "<ol>" +
+      "<li>Esvazia a caixa de captura: decide o balde de cada item.</li>" +
+      '<li>Escolhe no máximo 3 tarefas pra <b>Hoje</b>.</li>' +
+      "<li>No fim do dia, limpa as que já terminou.</li>" +
+    "</ol>" +
+    '<p class="method-kicker">Toda segunda (semanal)</p>' +
+    "<ol>" +
+      "<li>Zera a caixa de captura de novo.</li>" +
+      '<li>Olha o <b>Aguardando</b> e cobra quem te deve resposta.</li>' +
+      '<li>Nas tarefas grandes de <b>Esta semana</b>, define o próximo passo de cada uma.</li>' +
+    "</ol>" +
+    '<p class="method-kicker">Ficou em dúvida de onde encaixar uma tarefa?</p>' +
+    "<p>Pergunta pra ela:</p>" +
+    "<ul>" +
+      "<li>Isso empurra uma meta importante (da semana ou do Feirão)?</li>" +
+      "<li>Tem um prazo real?</li>" +
+      "<li>Tem alguém esperando por você?</li>" +
+    "</ul>" +
+    '<div class="method-rule">' +
+      '<span><b>2 sim</b> → Hoje</span>' +
+      '<span><b>1 sim</b> → Esta semana</span>' +
+      '<span><b>0 sim</b> → Depois</span>' +
+    "</div>" +
     "</div></details>";
 
   root.innerHTML = html;
