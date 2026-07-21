@@ -75,7 +75,7 @@
   .board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
   @media (max-width: 860px) { .board { grid-template-columns: 1fr 1fr; } }
   @media (max-width: 560px) { .board { grid-template-columns: 1fr; } }
-  .col { background: var(--card); border: 1.5px solid var(--line); border-radius: var(--radius-lg); padding: 14px; min-height: 120px; box-shadow: var(--shadow-sm); }
+  .col { background: var(--card); border: 1.5px solid var(--line); border-radius: var(--radius-lg); padding: 14px; min-height: 120px; min-width: 0; box-shadow: var(--shadow-sm); }
   .col-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
   .col-title { font-size: 13.5px; font-weight: 700; display: flex; align-items: center; gap: 5px; }
   .bicon { display: inline-flex; }
@@ -102,9 +102,13 @@
   .task.open .chev { transform: rotate(180deg); }
 
   .tag-urgent { color: var(--error); margin-right: 3px; }
-  .tag-area, .tag-due { font-size: 11px; padding: 2px 8px; border-radius: var(--radius-pill); margin-left: 6px; background: var(--later-bg); color: var(--muted); white-space: nowrap; }
+  .tag-area, .tag-due, .tag-wait { font-size: 11px; padding: 2px 8px; border-radius: var(--radius-pill); margin-left: 6px; background: var(--later-bg); color: var(--muted); white-space: nowrap; }
   .tag-due-today { background: var(--alert-bg); color: var(--alert); font-weight: 600; }
   .tag-due-overdue { background: var(--overdue-bg); color: var(--overdue); font-weight: 700; }
+  .tag-wait { background: var(--wait-bg); color: var(--wait); font-weight: 600; }
+
+  .limit-banner { background: var(--today-bg); color: var(--today); border-radius: var(--radius-sm); font-size: 11.5px; font-weight: 600; padding: 6px 9px; margin-bottom: 10px; }
+  .filter-banner { background: var(--accent-lighten); border: 1px solid var(--accent); color: var(--accent-dark); border-radius: var(--radius-md); font-size: 12.5px; font-weight: 600; padding: 8px 14px; margin: 0 0 12px; }
 
   .meta-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
   .meta-row input { font-size: 12.5px; padding: 6px 9px; border: 1px solid var(--line); border-radius: var(--radius-sm); font-family: var(--font-body); background: var(--card); color: var(--ink); outline: none; }
@@ -148,6 +152,8 @@
   .primary { width: 100%; border: none; background: var(--accent-dark); color: #fff; font-size: 15px; font-weight: 700; padding: 13px; border-radius: var(--radius-md); cursor: pointer; font-family: var(--font-body); transition: filter 150ms; }
   .primary:hover { filter: brightness(0.88); }
   .link { background: none; border: none; color: var(--link); cursor: pointer; font-size: 13.5px; text-decoration: underline; margin-top: 14px; display: inline-block; font-family: var(--font-body); }
+  .link-subtle { background: none; border: none; color: var(--muted-2); cursor: pointer; font-size: 12px; margin-top: 8px; display: inline-block; font-family: var(--font-body); }
+  .link-subtle:hover { color: var(--link); text-decoration: underline; }
   .msg { font-size: 13px; margin: 12px 0 0; min-height: 18px; }
   .msg.err { color: var(--error); }
   .msg.ok { color: var(--done); }
@@ -170,10 +176,10 @@ const SUPABASE_URL = "https://aaqshcyuxmeatpilcmgp.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_uD-_uFrzj10uTSxrQm4TZA_ezJEgkf-";
 
 const BUCKETS = [
-  { id: "hoje", title: "Hoje", sub: "máx. 3 chave" },
-  { id: "semana", title: "Esta semana", sub: "complexas" },
-  { id: "aguardando", title: "Aguardando", sub: "depende de alguém" },
-  { id: "depois", title: "Depois", sub: "não perder" },
+  { id: "hoje", title: "Hoje", sub: "máx. 3 chave", emptyMsg: "vazio — arrasta uma tarefa da captura pra focar" },
+  { id: "semana", title: "Esta semana", sub: "complexas", emptyMsg: "vazio — nada complexo por enquanto" },
+  { id: "aguardando", title: "Aguardando", sub: "depende de alguém", emptyMsg: "vazio — ninguém te devendo resposta" },
+  { id: "depois", title: "Depois", sub: "não perder", emptyMsg: "vazio — nada engavetado" },
 ];
 const CHIPS = [
   { b: "hoje", label: "Hoje", cls: "c-today" },
@@ -284,6 +290,7 @@ let expandedCols = {};
 let filters = { urgent: false, overdue: false, area: "" };
 let refocusCapture = false;
 let capturing = false;
+let methodOpen = null; // null = ainda não decidido nesta sessão
 
 function boot() {
   if (SUPABASE_URL.startsWith("COLE_") || SUPABASE_ANON_KEY.startsWith("COLE_")) {
@@ -326,7 +333,7 @@ function renderAuth(mode) {
         '<button class="primary" id="go">' + (signup ? "Criar acesso" : "Entrar") + "</button>" +
         '<div class="msg" id="msg"></div>' +
         '<button class="link" id="swap">' + (signup ? "Já tenho acesso — entrar" : "Primeira vez? Criar acesso") + "</button>" +
-        (signup ? "" : '<button class="link" id="forgot">Esqueci minha senha</button>') +
+        (signup ? "" : '<button class="link-subtle" id="forgot">Esqueci minha senha</button>') +
       '</div></div>' +
     '</div>';
 
@@ -478,6 +485,15 @@ function renderApp() {
   if (filterOn) html += '<button class="fclear" data-fclear>limpar filtro</button>';
   html += "</div>";
 
+  if (filterOn) {
+    const parts = [];
+    if (filters.urgent) parts.push("urgentes");
+    if (filters.overdue) parts.push("atrasadas");
+    if (filters.area === "__none__") parts.push("sem área");
+    else if (filters.area) parts.push('da área "' + esc(filters.area) + '"');
+    html += '<div class="filter-banner">🔎 Mostrando só: ' + parts.join(" + ") + ". Outras tarefas continuam salvas, só estão escondidas.</div>";
+  }
+
   html += '<div class="board">';
   BUCKETS.forEach((b) => {
     let items = tasks.filter((t) => t.bucket === b.id);
@@ -495,7 +511,8 @@ function renderApp() {
     html += '<span class="col-title"><span class="bicon bi-' + b.id + '">' + icon(BUCKET_ICON[b.id], 15) + '</span>' + b.title + "</span>";
     let sub = b.id === "hoje" ? active + "/3" + (active > 3 ? " — foca!" : "") : items.length + " · " + b.sub;
     html += '<span class="col-sub' + (b.id === "hoje" && active > 3 ? " over" : "") + '">' + sub + "</span></div>";
-    if (!items.length) html += '<div class="empty-note">' + (filterOn ? "nenhuma com esse filtro" : "vazio") + "</div>";
+    if (b.id === "hoje" && active > 3) html += '<div class="limit-banner">Mais de 3 em Hoje — considera mover alguma pra Esta semana.</div>';
+    if (!items.length) html += '<div class="empty-note">' + (filterOn ? "nenhuma com esse filtro" : b.emptyMsg) + "</div>";
     visible.forEach((t) => {
       const due = t.due_date ? dueStatus(t.due_date) : "";
       html += '<div class="task' + (t.done ? " done" : "") + '" data-id="' + t.id + '"><div class="task-row">';
@@ -505,7 +522,7 @@ function renderApp() {
       html += esc(t.text);
       if (t.area) html += '<span class="tag-area">' + esc(t.area) + '</span>';
       if (t.due_date) html += '<span class="tag-due' + (due ? " tag-due-" + due : "") + '">' + fmtDue(t.due_date) + '</span>';
-      if (t.waiting_on) html += '<span class="tag-area">⏳ ' + esc(t.waiting_on) + '</span>';
+      if (t.waiting_on) html += '<span class="tag-wait">⏳ ' + esc(t.waiting_on) + '</span>';
       html += "</span>";
       html += '<span class="chev" data-open="' + t.id + '">' + icon('chevron', 14) + '</span>';
       html += '<button class="x" data-del="' + t.id + '" title="remover">' + icon('close', 13) + '</button></div><div class="move">';
@@ -526,8 +543,12 @@ function renderApp() {
   });
   html += "</div>";
 
+  if (methodOpen === null) {
+    methodOpen = !localStorage.getItem("yuca_method_seen");
+    localStorage.setItem("yuca_method_seen", "1");
+  }
   html +=
-    '<details class="method"><summary>Como usar (o método)</summary><div class="method-body">' +
+    '<details class="method"' + (methodOpen ? " open" : "") + '><summary>Como usar (o método)</summary><div class="method-body">' +
     "<p><b>Ritual diário (10 min):</b> esvazia a captura, escolhe até 3 chave pro Hoje, distribui o resto. No fim do dia, limpa as concluídas.</p>" +
     "<p><b>Ritual semanal (segunda):</b> zera a captura, revê o Aguardando e cobra quem precisa, quebra as de Esta semana em próximos passos.</p>" +
     '<p><b>Priorização, na dúvida:</b> move uma meta da semana / do Feirão? tem prazo real? tem alguém bloqueado te esperando? Dois "sim" = Hoje. Um = Semana. Nenhum = Depois.</p>' +
@@ -553,6 +574,9 @@ function renderApp() {
     const ci = document.getElementById("capInput");
     if (ci) ci.focus();
   }
+
+  const methodEl = document.querySelector("details.method");
+  if (methodEl) methodEl.addEventListener("toggle", () => { methodOpen = methodEl.open; });
 }
 
 /* Anexados uma única vez em #root (que nunca é recriado) — evita acumular
