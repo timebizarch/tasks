@@ -32,3 +32,7 @@ alter table tasks add column if not exists waiting_on text;
 -- pra dar pra ver o histórico de tudo que já foi feito.
 alter table tasks add column if not exists done_at timestamptz;
 alter table tasks add column if not exists cleared_at timestamptz;
+
+-- v2.4: origem da captura (ex: 'slack'). Preenchido pela automação do
+-- Make; captura manual pelo app deixa null. Mostra uma tag "via Slack".
+alter table tasks add column if not exists source text;
