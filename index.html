@@ -423,7 +423,13 @@ function findSimilarTask(text) {
     if (t.done || t.cleared_at) return false;
     const tn = normText(t.text);
     if (!tn) return false;
-    return tn === norm || tn.includes(norm) || norm.includes(tn);
+    if (tn === norm) return true;
+    // "contém" só conta se os textos tiverem tamanho parecido — evita marcar
+    // uma tarefa curta ("Revisar contrato") como duplicata de uma bem mais
+    // específica e longa ("Revisar contrato de aluguel do Yuker novo").
+    const shorter = Math.min(tn.length, norm.length), longer = Math.max(tn.length, norm.length);
+    if (shorter / longer < 0.75) return false;
+    return tn.includes(norm) || norm.includes(tn);
   }) || null;
 }
 
