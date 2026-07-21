@@ -40,13 +40,15 @@ Separar três coisas que hoje se misturam: capturar, priorizar, executar.
 
 ## Schema
 
-Tabela `tasks`: `id` (uuid), `user_id` (uuid, default `auth.uid()`, FK pra `auth.users`, on delete cascade), `text` (text), `bucket` (text, default `inbox`), `done` (bool, default false), `created_at` (timestamptz), `area` (text, opcional — tag livre tipo "growth"/"ops"), `urgent` (bool, default false), `due_date` (date, opcional), `waiting_on` (text, opcional — só usado no balde Aguardando). RLS ligado com policy `for all using (auth.uid() = user_id) with check (...)`. SQL completo no `setup.sql`.
+Tabela `tasks`: `id` (uuid), `user_id` (uuid, default `auth.uid()`, FK pra `auth.users`, on delete cascade), `text` (text), `bucket` (text, default `inbox`), `done` (bool, default false), `created_at` (timestamptz), `area` (text, opcional — tag livre tipo "growth"/"ops"), `urgent` (bool, default false), `due_date` (date, opcional), `waiting_on` (text, opcional — só usado no balde Aguardando), `done_at` (timestamptz, opcional — quando foi marcada concluída), `cleared_at` (timestamptz, opcional — quando foi tirada da vista pelo "limpar concluídas"). RLS ligado com policy `for all using (auth.uid() = user_id) with check (...)`. SQL completo no `setup.sql`.
 
 **v2 — priorização leve:** decidido não usar matriz GUT (gravidade/urgência/tendência) por tarefa porque adiciona fricção na captura. Em vez disso: tag de área livre (texto, com sugestão das últimas usadas via `<datalist>`), flag de urgência (🔥) e prazo opcional — todos editados só na hora de organizar a tarefa (no painel que abre ao clicar nela), nunca na captura. Prazo vencido fica destacado em vermelho, prazo de hoje em âmbar. GUT continua útil como pergunta mental no ritual semanal, não como campo salvo.
 
 **v2.1 — captura inteligente:** `"texto | área | até terça"` ou `"texto, urgente, até sexta"` já preenchem área/prazo/urgência na hora de capturar (ver comentário em `smartParse()` no `index.html`).
 
 **v2.2 — ajustes de diagnóstico:** texto da tarefa agora é editável (painel ao clicar), filtro por urgência/atraso/área (incluindo "sem área"), campo "aguardando quem" no balde Aguardando, confirmação antes de deletar, e correções de robustez (flash de sessão em background, parser de datas gulosa, foco do campo de captura, duplo clique).
+
+**v2.3 — auto-promoção e histórico:** tarefa de Esta semana/Aguardando/Depois com `due_date` vencendo hoje ou no passado sobe sozinha pra Hoje ao carregar o app (avisa com um banner). "Limpar concluídas" não apaga mais — só marca `cleared_at` e some da coluna; um painel "Histórico de concluídas" no rodapé mostra tudo que já foi feito, agrupado por dia.
 
 ## Setup pendente (não feito ainda)
 

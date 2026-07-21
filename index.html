@@ -134,6 +134,10 @@
   .method-body li { margin-bottom: 5px; }
   .method-rule { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
   .method-rule span { background: var(--later-bg); border-radius: var(--radius-sm); padding: 6px 12px; font-size: 12.5px; }
+  .history-day { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; color: var(--muted-2); margin: 14px 0 6px !important; }
+  .history-day:first-child { margin-top: 2px !important; }
+  .history-item { font-size: 13px; color: var(--muted); padding: 4px 0; border-top: 1px solid var(--line); }
+  .history-item:first-of-type { border-top: none; }
 
   .auth-wrap { display: grid; grid-template-columns: 1.05fr 1fr; min-height: 560px; border-radius: var(--radius-xl); overflow: hidden; box-shadow: var(--shadow-lg); background: var(--card); margin-top: 16px; }
   @media (max-width: 760px) { .auth-wrap { grid-template-columns: 1fr; min-height: auto; margin-top: 0; } }
@@ -233,6 +237,23 @@ function dueStatus(iso) {
   return "";
 }
 function fmtDue(iso) { const [, m, d] = iso.split("-"); return d + "/" + m; }
+function fmtHistoryDay(iso) {
+  if (!iso) return "sem data";
+  const d = new Date(iso + "T00:00:00");
+  return d.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
+}
+function historyHtml(list) {
+  const done = list.filter((t) => t.done).slice()
+    .sort((a, b) => (b.done_at || b.created_at || "").localeCompare(a.done_at || a.created_at || ""));
+  if (!done.length) return '<p class="empty-note">nada concluído ainda</p>';
+  let html = "", lastDay = null;
+  done.forEach((t) => {
+    const day = (t.done_at || t.created_at || "").slice(0, 10);
+    if (day !== lastDay) { html += '<p class="history-day">' + fmtHistoryDay(day) + "</p>"; lastDay = day; }
+    html += '<div class="history-item">' + esc(t.text) + (t.area ? ' <span class="tag-area">' + esc(t.area) + "</span>" : "") + "</div>";
+  });
+  return html;
+}
 
 /* ---------- CAPTURA INTELIGENTE ----------
    "texto | área | até terça"  ->  área + prazo já preenchidos
@@ -385,11 +406,23 @@ function reportError(action, error) {
   console.error(action, error);
   alert("Não deu pra " + action + ": " + (error && error.message ? error.message : "erro desconhecido"));
 }
+let justPromoted = 0;
+async function autoPromoteOverdue() {
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const toPromote = tasks.filter((t) => t.bucket !== "hoje" && t.bucket !== "inbox" && !t.done && t.due_date && t.due_date <= todayIso);
+  if (!toPromote.length) return;
+  const ids = toPromote.map((t) => t.id);
+  const { error } = await sb.from("tasks").update({ bucket: "hoje" }).in("id", ids);
+  if (error) { reportError("mover tarefas vencidas pra Hoje", error); return; }
+  toPromote.forEach((t) => { t.bucket = "hoje"; });
+  justPromoted = toPromote.length;
+}
 async function loadAndRender(quiet) {
   if (!quiet) root.innerHTML = '<div class="loading">Carregando suas tarefas…</div>';
   const { data, error } = await sb.from("tasks").select("*").order("created_at", { ascending: true });
   if (error) { root.innerHTML = '<div class="loading">Erro ao carregar: ' + esc(error.message) + "</div>"; return; }
   tasks = data || [];
+  await autoPromoteOverdue();
   renderApp();
 }
 async function addTask(raw) {
@@ -407,7 +440,7 @@ async function moveTask(id, to) {
   loadAndRender(true);
 }
 async function toggleTask(id, done) {
-  const { error } = await sb.from("tasks").update({ done }).eq("id", id);
+  const { error } = await sb.from("tasks").update({ done, done_at: done ? new Date().toISOString() : null }).eq("id", id);
   if (error) { reportError("marcar a tarefa", error); return; }
   loadAndRender(true);
 }
@@ -417,7 +450,8 @@ async function delTask(id) {
   loadAndRender(true);
 }
 async function clearDone(bucket) {
-  const { error } = await sb.from("tasks").delete().eq("bucket", bucket).eq("done", true);
+  // Não apaga: só tira da vista. A tarefa continua no histórico de concluídas.
+  const { error } = await sb.from("tasks").update({ cleared_at: new Date().toISOString() }).eq("bucket", bucket).eq("done", true);
   if (error) { reportError("limpar as concluídas", error); return; }
   loadAndRender(true);
 }
@@ -499,10 +533,14 @@ function renderApp() {
     else if (filters.area) parts.push('da área "' + esc(filters.area) + '"');
     html += '<div class="filter-banner">🔎 Mostrando só: ' + parts.join(" + ") + ". Outras tarefas continuam salvas, só estão escondidas.</div>";
   }
+  if (justPromoted > 0) {
+    html += '<div class="filter-banner">⏰ ' + justPromoted + (justPromoted === 1 ? " tarefa venceu e foi movida" : " tarefas venceram e foram movidas") + ' pra Hoje automaticamente.</div>';
+    justPromoted = 0;
+  }
 
   html += '<div class="board">';
   BUCKETS.forEach((b) => {
-    let items = tasks.filter((t) => t.bucket === b.id);
+    let items = tasks.filter((t) => t.bucket === b.id && !t.cleared_at);
     const active = items.filter((t) => !t.done).length;
     const hasDone = items.some((t) => t.done);
     if (filters.urgent) items = items.filter((t) => t.urgent);
@@ -548,6 +586,12 @@ function renderApp() {
     html += "</div>";
   });
   html += "</div>";
+
+  const doneCount = tasks.filter((t) => t.done).length;
+  html +=
+    '<details class="method"><summary>Histórico de concluídas (' + doneCount + ")</summary><div class=\"method-body\">" +
+    historyHtml(tasks) +
+    "</div></details>";
 
   if (methodOpen === null) {
     methodOpen = !localStorage.getItem("yuca_method_seen");
@@ -624,7 +668,7 @@ root.addEventListener("click", (e) => {
     const t = tasks.find((x) => x.id === id);
     if (confirm('Remover "' + (t ? t.text : "essa tarefa") + '"?')) delTask(id);
   }
-  else if (clearBtn) { if (confirm("Apagar as tarefas concluídas dessa coluna?")) clearDone(clearBtn.dataset.clear); }
+  else if (clearBtn) { if (confirm("Tirar as concluídas da vista? (continuam salvas no histórico)")) clearDone(clearBtn.dataset.clear); }
   else if (urgentBtn) { const id = urgentBtn.dataset.urgent; const t = tasks.find((x) => x.id === id); toggleUrgent(id, t && t.urgent); }
   else if (moreBtn) { expandedCols[moreBtn.dataset.more] = true; renderApp(); }
   else if (lessBtn) { delete expandedCols[lessBtn.dataset.less]; renderApp(); }

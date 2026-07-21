@@ -26,3 +26,9 @@ alter table tasks add column if not exists due_date date;
 
 -- v2.2: campo "aguardando quem" (só usado no balde Aguardando).
 alter table tasks add column if not exists waiting_on text;
+
+-- v2.3: rastreabilidade — quando foi concluída e quando foi "limpa" da vista.
+-- "limpar concluídas" agora só marca cleared_at (não apaga mais a linha),
+-- pra dar pra ver o histórico de tudo que já foi feito.
+alter table tasks add column if not exists done_at timestamptz;
+alter table tasks add column if not exists cleared_at timestamptz;
