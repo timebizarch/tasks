@@ -47,6 +47,8 @@
   .capture { display: flex; gap: 8px; margin-bottom: 6px; }
   .capture input { flex: 1; font-size: 15px; padding: 13px 15px; border: 1.5px solid var(--line); border-radius: var(--radius-md); background: var(--card); color: var(--ink); outline: none; font-family: var(--font-body); transition: border-color 150ms, box-shadow 150ms; }
   .capture input:focus { border-color: var(--accent); box-shadow: var(--shadow-focus); }
+  .capture input[type="date"] { flex: none; width: 132px; font-size: 13.5px; padding: 0 10px; }
+  .capture .meta-urgent-btn { flex: none; padding: 0 13px; }
   .capture button { border: none; background: var(--accent-dark); color: #fff; font-size: 14px; font-weight: 700; padding: 0 20px; border-radius: var(--radius-md); cursor: pointer; font-family: var(--font-body); transition: filter 150ms; }
   .capture button:hover { filter: brightness(0.88); }
   .hint { color: var(--muted); font-size: 12.5px; margin: 0 2px 20px; }
@@ -174,6 +176,12 @@
   .setup { max-width: 620px; margin: 60px auto; font-size: 14px; color: var(--muted); }
   .setup code { background: var(--later-bg); padding: 2px 6px; border-radius: 5px; font-size: 13px; }
   .loading { color: var(--muted); font-size: 14px; padding: 60px 0; text-align: center; }
+
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(16px); background: var(--ink); color: #fff;
+    padding: 12px 20px; border-radius: var(--radius-md); font-size: 13.5px; box-shadow: var(--shadow-lg); z-index: 1000;
+    opacity: 0; transition: opacity 200ms, transform 200ms; max-width: min(90vw, 420px); font-family: var(--font-body); }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast-err { background: var(--error); }
 
   .confetti-bit { position: fixed; pointer-events: none; z-index: 999;
     animation-name: confetti-fall; animation-timing-function: linear; animation-fill-mode: forwards; }
@@ -416,6 +424,10 @@ let filters = { urgent: false, overdue: false, area: "" };
 let refocusCapture = false;
 let capturing = false;
 let methodOpen = null; // null = ainda não decidido nesta sessão
+let quickUrgent = false;
+let quickDue = "";
+let searchQuery = "";
+let refocusSearch = false;
 
 function boot() {
   if (SUPABASE_URL.startsWith("COLE_") || SUPABASE_ANON_KEY.startsWith("COLE_")) {
@@ -500,9 +512,17 @@ function doAuth(signup) {
 async function signOut() { await sb.auth.signOut(); }
 
 /* ---------- DADOS ---------- */
+function showToast(message, isError) {
+  const t = document.createElement("div");
+  t.className = "toast" + (isError ? " toast-err" : "");
+  t.textContent = message;
+  document.body.appendChild(t);
+  requestAnimationFrame(() => t.classList.add("show"));
+  setTimeout(() => { t.classList.remove("show"); setTimeout(() => t.remove(), 250); }, 4000);
+}
 function reportError(action, error) {
   console.error(action, error);
-  alert("Não deu pra " + action + ": " + (error && error.message ? error.message : "erro desconhecido"));
+  showToast("Não deu pra " + action + ": " + (error && error.message ? error.message : "erro desconhecido"), true);
 }
 let justPromoted = 0;
 async function autoPromoteOverdue() {
@@ -523,11 +543,13 @@ async function loadAndRender(quiet) {
   await autoPromoteOverdue();
   renderApp();
 }
-async function addTask(raw) {
+async function addTask(raw, overrides) {
   const p = smartParse(raw);
+  const urgent = (overrides && overrides.urgent) || p.urgent;
+  const due_date = (overrides && overrides.due_date) || p.due_date;
   const { error } = await sb.from("tasks").insert({
     text: p.text, bucket: "inbox", done: false,
-    area: p.area, urgent: p.urgent, due_date: p.due_date,
+    area: p.area, urgent: urgent, due_date: due_date,
   });
   if (error) { reportError("capturar a tarefa", error); return; }
   loadAndRender(true);
@@ -601,10 +623,12 @@ function renderApp() {
     '<div class="who">' + esc(userEmail) + '<button id="out">sair</button></div></header>' +
     '<div class="date">' + new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" }) + "</div>" +
     todaySummaryHtml() +
-    '<div class="capture"><input id="capInput" placeholder="Anota qualquer coisa que chegou… (Enter pra capturar)" autocomplete="off" />' +
+    '<div class="capture"><input id="capInput" placeholder="Anota qualquer coisa que chegou… (Enter pra capturar, / foca aqui)" autocomplete="off" />' +
+    '<button id="capUrgent" class="meta-urgent-btn' + (quickUrgent ? " on" : "") + '" title="marcar urgente">' + icon('flame', 13) + '</button>' +
+    '<input type="date" id="capDue" value="' + esc(quickDue) + '" title="prazo" />' +
     '<button id="capBtn">' + icon('plus', 15) + ' Capturar</button></div>' +
     '<p class="hint">Capturar não é decidir. Joga tudo aqui primeiro e organiza depois. ' +
-    'Dica: "tarefa | área | até terça" ou "tarefa, urgente, até sexta" já preenchem área/prazo/urgência.</p>';
+    'Dica: "tarefa | área | até terça" ou "tarefa, urgente, até sexta" já preenchem área/prazo/urgência — ou usa os botões 🔥/📅 ao lado.</p>';
 
   const inboxExpanded = !!expandedCols.__inbox__;
   const inboxVisible = inboxExpanded ? inbox : inbox.slice(0, COL_LIMIT);
@@ -746,11 +770,16 @@ function renderApp() {
     if (!v || capturing) return;
     capturing = true;
     refocusCapture = true;
+    const overrides = { urgent: quickUrgent, due_date: quickDue || null };
+    quickUrgent = false;
+    quickDue = "";
     el.value = "";
-    try { await addTask(v); } finally { capturing = false; }
+    try { await addTask(v, overrides); } finally { capturing = false; }
   };
   document.getElementById("capBtn").onclick = cap;
   document.getElementById("capInput").addEventListener("keydown", (e) => { if (e.key === "Enter") cap(); });
+  document.getElementById("capUrgent").onclick = () => { quickUrgent = !quickUrgent; renderApp(); };
+  document.getElementById("capDue").onchange = (e) => { quickDue = e.target.value; };
 
   if (refocusCapture) {
     refocusCapture = false;
@@ -761,6 +790,17 @@ function renderApp() {
   const methodEl = document.querySelector("details.method");
   if (methodEl) methodEl.addEventListener("toggle", () => { methodOpen = methodEl.open; });
 }
+
+/* Atalho global: "/" foca a captura de qualquer lugar da página
+   (a menos que já esteja digitando em outro campo). */
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "/") return;
+  const tag = document.activeElement && document.activeElement.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+  e.preventDefault();
+  const ci = document.getElementById("capInput");
+  if (ci) ci.focus();
+});
 
 /* Anexados uma única vez em #root (que nunca é recriado) — evita acumular
    listeners duplicados a cada renderApp() e o toggle "cancelar a si mesmo". */
