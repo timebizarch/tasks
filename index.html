@@ -132,6 +132,15 @@
   .clearbtn { margin-top: 8px; border: none; background: none; color: var(--muted); font-size: 12px; cursor: pointer; padding: 2px 0; font-family: var(--font-body); }
   .clearbtn:hover { color: var(--done); }
 
+  .subtask-block { border-top: 1px dashed var(--line-strong); margin-top: 4px; padding-top: 8px; }
+  .subtask-list { display: flex; flex-direction: column; gap: 5px; margin-bottom: 8px; }
+  .subtask-item { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+  .subtask-item input { width: 15px; height: 15px; accent-color: var(--done); flex: none; cursor: pointer; }
+  .subtask-item.done { text-decoration: line-through; color: var(--muted-2); }
+  .subtask-add { width: 100%; font-size: 12.5px; padding: 7px 10px; border: 1px dashed var(--line-strong); border-radius: var(--radius-sm); font-family: var(--font-body); background: var(--card); color: var(--ink); outline: none; }
+  .subtask-add:focus { border-style: solid; border-color: var(--accent); box-shadow: var(--shadow-focus); }
+  .tag-parent { display: inline-flex; align-items: center; font-size: 11px; padding: 2px 8px; border-radius: var(--radius-pill); margin-left: 6px; background: var(--week-bg); color: var(--week); white-space: nowrap; }
+
   details.method { margin-top: 30px; border: 1.5px solid var(--line); border-radius: var(--radius-lg); background: var(--card); padding: 4px 18px; }
   details.method summary { cursor: pointer; font-size: 13px; font-weight: 700; padding: 12px 0; list-style: none; }
   details.method summary::-webkit-details-marker { display: none; }
@@ -481,6 +490,7 @@ let capturing = false;
 let methodOpen = null; // null = ainda não decidido nesta sessão
 let searchQuery = "";
 let refocusSearch = false;
+let refocusSubtask = null; // id da tarefa-mãe cujo campo "próximo passo" deve reganhar foco
 
 function boot() {
   if (SUPABASE_URL.startsWith("COLE_") || SUPABASE_ANON_KEY.startsWith("COLE_")) {
@@ -605,6 +615,16 @@ async function addTask(raw) {
   if (error) { reportError("capturar a tarefa", error); return; }
   loadAndRender(true);
 }
+async function addSubtask(parentId, raw) {
+  const p = smartParse(raw);
+  const { error } = await sb.from("tasks").insert({
+    text: p.text, bucket: "inbox", done: false,
+    area: p.area, urgent: p.urgent, due_date: p.due_date,
+    parent_id: parentId,
+  });
+  if (error) { reportError("adicionar o próximo passo", error); return; }
+  loadAndRender(true);
+}
 async function moveTask(id, to) {
   const { error } = await sb.from("tasks").update({ bucket: to, done: false }).eq("id", id);
   if (error) { reportError("mover a tarefa", error); return; }
@@ -665,6 +685,22 @@ function distinctAreas(list) {
   return Array.from(seen.values());
 }
 function sameArea(a, b) { return !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase(); }
+function subtaskBlockHtml(parent) {
+  const children = tasks.filter((t) => t.parent_id === parent.id);
+  const doneCount = children.filter((t) => t.done).length;
+  let html = '<div class="subtask-block"><p class="method-kicker">Próximos passos' +
+    (children.length ? " (" + doneCount + "/" + children.length + ")" : "") + "</p>";
+  if (children.length) {
+    html += '<div class="subtask-list">';
+    children.forEach((c) => {
+      html += '<label class="subtask-item' + (c.done ? " done" : "") + '"><input type="checkbox" data-toggle="' + c.id + '"' + (c.done ? " checked" : "") + " />" + esc(c.text) + "</label>";
+    });
+    html += "</div>";
+  }
+  html += '<input type="text" class="subtask-add" data-addstep="' + parent.id + '" placeholder="+ adicionar próximo passo… (Enter)" />';
+  html += "</div>";
+  return html;
+}
 
 function renderApp() {
   const inbox = tasks.filter((t) => t.bucket === "inbox");
@@ -691,6 +727,10 @@ function renderApp() {
     html += esc(t.text);
     if (t.area) html += '<span class="tag-area">' + esc(t.area) + '</span>';
     if (t.due_date) html += '<span class="tag-due' + (due ? " tag-due-" + due : "") + '">' + fmtDue(t.due_date) + '</span>';
+    if (t.parent_id) {
+      const parent = tasks.find((p) => p.id === t.parent_id);
+      if (parent) html += '<span class="tag-parent" title="Passo de: ' + esc(parent.text) + '">↳ ' + esc(parent.text.length > 26 ? parent.text.slice(0, 26) + "…" : parent.text) + '</span>';
+    }
     html += '</span><span class="chips">';
     CHIPS.forEach((c) => { html += '<button class="chip ' + c.cls + '" data-move="' + t.id + '" data-to="' + c.b + '">' + c.label + "</button>"; });
     html += '</span><button class="x" data-del="' + t.id + '" title="descartar">' + icon('close', 13) + '</button></div>';
@@ -769,6 +809,10 @@ function renderApp() {
       } else if (t.waiting_on) {
         html += '<span class="tag-wait">' + icon('wait', 12) + ' ' + esc(t.waiting_on) + '</span>';
       }
+      if (t.parent_id) {
+        const parent = tasks.find((p) => p.id === t.parent_id);
+        if (parent) html += '<span class="tag-parent" title="Passo de: ' + esc(parent.text) + '">↳ ' + esc(parent.text.length > 26 ? parent.text.slice(0, 26) + "…" : parent.text) + '</span>';
+      }
       html += "</span>";
       html += '<span class="chev" data-open="' + t.id + '">' + icon('chevron', 14) + '</span>';
       html += '<button class="x" data-del="' + t.id + '" title="remover">' + icon('close', 13) + '</button></div><div class="move">';
@@ -780,7 +824,9 @@ function renderApp() {
       html += '<input type="date" data-due="' + t.id + '" value="' + (t.due_date || "") + '" />';
       html += '<button class="meta-urgent-btn' + (t.urgent ? " on" : "") + '" data-urgent="' + t.id + '">' + icon('flame', 13) + ' urgente</button>';
       if (b.id === "aguardando") html += '<input type="text" data-waiting="' + t.id + '" placeholder="aguardando quem?" value="' + esc(t.waiting_on || "") + '" />';
-      html += "</div></div></div>";
+      html += "</div>";
+      if (!t.parent_id) html += subtaskBlockHtml(t);
+      html += "</div></div>";
     });
     if (hidden > 0) html += '<button class="clearbtn" data-more="' + b.id + '">ver mais (' + hidden + ')</button>';
     else if (expanded && items.length > COL_LIMIT) html += '<button class="clearbtn" data-less="' + b.id + '">ver menos</button>';
@@ -866,6 +912,12 @@ function renderApp() {
 
   const methodEl = document.querySelector("details.method");
   if (methodEl) methodEl.addEventListener("toggle", () => { methodOpen = methodEl.open; });
+
+  if (refocusSubtask) {
+    const stepEl = root.querySelector('[data-addstep="' + refocusSubtask + '"]');
+    refocusSubtask = null;
+    if (stepEl) stepEl.focus();
+  }
 }
 
 /* Atalho global: "/" foca a captura de qualquer lugar da página
@@ -895,7 +947,11 @@ root.addEventListener("click", (e) => {
   else if (delBtn) {
     const id = delBtn.dataset.del;
     const t = tasks.find((x) => x.id === id);
-    if (confirm('Remover "' + (t ? t.text : "essa tarefa") + '"?')) delTask(id);
+    const childCount = tasks.filter((x) => x.parent_id === id).length;
+    const msg = childCount > 0
+      ? "Essa tarefa tem " + childCount + (childCount === 1 ? " passo" : " passos") + " ligado" + (childCount === 1 ? "" : "s") + " a ela — remover ela remove os passos também. Continuar?"
+      : 'Remover "' + (t ? t.text : "essa tarefa") + '"?';
+    if (confirm(msg)) delTask(id);
   }
   else if (clearBtn) { if (confirm("Tirar as concluídas da vista? (continuam salvas no histórico)")) clearDone(clearBtn.dataset.clear); }
   else if (urgentBtn) { const id = urgentBtn.dataset.urgent; const t = tasks.find((x) => x.id === id); toggleUrgent(id, t && t.urgent); }
@@ -920,6 +976,15 @@ root.addEventListener("focusout", (e) => {
   if (e.target.dataset.area) updateArea(e.target.dataset.area, e.target.value.trim());
   else if (e.target.dataset.text) updateText(e.target.dataset.text, e.target.value);
   else if (e.target.dataset.waiting) updateWaitingOn(e.target.dataset.waiting, e.target.value.trim());
+});
+root.addEventListener("keydown", (e) => {
+  if (e.key !== "Enter" || !e.target.dataset.addstep) return;
+  const v = e.target.value.trim();
+  if (!v) return;
+  const parentId = e.target.dataset.addstep;
+  e.target.value = "";
+  refocusSubtask = parentId;
+  addSubtask(parentId, v);
 });
 
 boot();

@@ -40,7 +40,7 @@ Separar três coisas que hoje se misturam: capturar, priorizar, executar.
 
 ## Schema
 
-Tabela `tasks`: `id` (uuid), `user_id` (uuid, default `auth.uid()`, FK pra `auth.users`, on delete cascade), `text` (text), `bucket` (text, default `inbox`), `done` (bool, default false), `created_at` (timestamptz), `area` (text, opcional — tag livre tipo "growth"/"ops"), `urgent` (bool, default false), `due_date` (date, opcional), `waiting_on` (text, opcional — só usado no balde Aguardando), `done_at` (timestamptz, opcional — quando foi marcada concluída), `cleared_at` (timestamptz, opcional — quando foi tirada da vista pelo "limpar concluídas"). RLS ligado com policy `for all using (auth.uid() = user_id) with check (...)`. SQL completo no `setup.sql`.
+Tabela `tasks`: `id` (uuid), `user_id` (uuid, default `auth.uid()`, FK pra `auth.users`, on delete cascade), `text` (text), `bucket` (text, default `inbox`), `done` (bool, default false), `created_at` (timestamptz), `area` (text, opcional — tag livre tipo "growth"/"ops"), `urgent` (bool, default false), `due_date` (date, opcional), `waiting_on` (text, opcional — só usado no balde Aguardando), `done_at` (timestamptz, opcional — quando foi marcada concluída), `cleared_at` (timestamptz, opcional — quando foi tirada da vista pelo "limpar concluídas"), `source` (text, opcional — origem da captura, ex. `'slack'`), `parent_id` (uuid, opcional, FK pra `tasks`, on delete cascade — um nível de subtarefa). RLS ligado com policy `for all using (auth.uid() = user_id) with check (...)`. SQL completo no `setup.sql`.
 
 **v2 — priorização leve:** decidido não usar matriz GUT (gravidade/urgência/tendência) por tarefa porque adiciona fricção na captura. Em vez disso: tag de área livre (texto, com sugestão das últimas usadas via `<datalist>`), flag de urgência (🔥) e prazo opcional — todos editados só na hora de organizar a tarefa (no painel que abre ao clicar nela), nunca na captura. Prazo vencido fica destacado em vermelho, prazo de hoje em âmbar. GUT continua útil como pergunta mental no ritual semanal, não como campo salvo.
 
@@ -49,6 +49,8 @@ Tabela `tasks`: `id` (uuid), `user_id` (uuid, default `auth.uid()`, FK pra `auth
 **v2.2 — ajustes de diagnóstico:** texto da tarefa agora é editável (painel ao clicar), filtro por urgência/atraso/área (incluindo "sem área"), campo "aguardando quem" no balde Aguardando, confirmação antes de deletar, e correções de robustez (flash de sessão em background, parser de datas gulosa, foco do campo de captura, duplo clique).
 
 **v2.3 — auto-promoção e histórico:** tarefa de Esta semana/Aguardando/Depois com `due_date` vencendo hoje ou no passado sobe sozinha pra Hoje ao carregar o app (avisa com um banner). "Limpar concluídas" não apaga mais — só marca `cleared_at` e some da coluna; um painel "Histórico de concluídas" no rodapé mostra tudo que já foi feito, agrupado por dia.
+
+**v2.5 — subtarefas ("próximos passos"):** tarefa pode ter `parent_id` apontando pra outra tarefa — um nível só de aninhamento (uma subtask não pode ter subtask). Cada passo é uma tarefa normal (tem seu próprio balde/área/prazo/urgência, entra em busca/filtro/promoção automática/histórico igual a qualquer outra). No painel de uma tarefa-mãe, um campo "+ adicionar próximo passo" cria o passo direto na `inbox` (capturar não é decidir, vale pra passos também), e uma mini-checklist mostra o progresso ("N/M passos"). Cada passo também aparece como card independente no balde em que estiver, com uma tag "↳ de: ..." apontando pra mãe. Concluir todos os passos **não** fecha a mãe automaticamente — quem decide isso é a Giovanna. Apagar a mãe apaga os passos junto (`on delete cascade`), com aviso específico antes de confirmar.
 
 ## Setup pendente (não feito ainda)
 
@@ -64,7 +66,6 @@ Tabela `tasks`: `id` (uuid), `user_id` (uuid, default `auth.uid()`, FK pra `auth
 - Ordenação/arrastar dentro do balde e persistir posição (hoje ordena por `created_at`).
 - Data de vencimento e um destaque visual pro que vence hoje.
 - Realtime do Supabase pra sincronizar entre abas/dispositivos abertos ao mesmo tempo.
-- Subtarefas/próximos passos dentro de uma tarefa de `semana`.
 - Atalho de captura rápida (PWA + share target no celular) pra jogar nota direto no `inbox`.
 - Integração de entrada com as ferramentas dela (Pipedrive/HubSpot/Slack) pra capturar demanda sem digitar.
 

@@ -36,3 +36,8 @@ alter table tasks add column if not exists cleared_at timestamptz;
 -- v2.4: origem da captura (ex: 'slack'). Preenchido pela automação do
 -- Make; captura manual pelo app deixa null. Mostra uma tag "via Slack".
 alter table tasks add column if not exists source text;
+
+-- v2.5: subtarefas ("próximos passos"). Uma subtask é uma tarefa normal
+-- com parent_id apontando pra outra tarefa — um nível só de aninhamento.
+-- Apagar a tarefa-mãe apaga os passos junto (on delete cascade).
+alter table tasks add column if not exists parent_id uuid references tasks(id) on delete cascade;
