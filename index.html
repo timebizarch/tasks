@@ -96,7 +96,7 @@
   .task.done .txt { text-decoration: line-through; color: var(--muted-2); }
   .task .move { display: none; flex-direction: column; gap: 8px; margin: 8px 0 2px 25px; }
   .task.open .move { display: flex; }
-  .move-chips { display: flex; gap: 5px; flex-wrap: wrap; }
+  .move-select { align-self: flex-start; font-size: 12.5px; padding: 6px 9px; border: 1px solid var(--line); border-radius: var(--radius-sm); font-family: var(--font-body); background: var(--card); color: var(--ink); }
   .empty-note { color: var(--muted-2); font-size: 12.5px; font-style: italic; padding: 4px 0; }
   .chev { flex: none; color: var(--muted-2); cursor: pointer; display: inline-flex; transition: transform 150ms; margin-top: 2px; }
   .task.open .chev { transform: rotate(180deg); }
@@ -250,18 +250,59 @@ function daysBetween(isoA, isoB) {
   const b = new Date(isoB.slice(0, 10) + "T00:00:00");
   return Math.round((b - a) / 86400000);
 }
+function todaySummaryHtml() {
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const doneToday = tasks.filter((t) => t.done && t.done_at && t.done_at.slice(0, 10) === todayIso);
+  if (!doneToday.length) return "";
+  const dias = doneToday.map((t) => daysBetween(t.created_at, t.done_at)).filter((d) => d !== null);
+  const avg = dias.length ? (dias.reduce((a, b) => a + b, 0) / dias.length).toFixed(1) : null;
+  return '<div class="filter-banner">✅ Hoje você já concluiu ' + doneToday.length + (doneToday.length === 1 ? " tarefa" : " tarefas") +
+    (avg !== null ? " — média de " + avg + " dias entre criar e terminar." : ".") + "</div>";
+}
+const HISTORY_LIMIT = 15;
+function slaByArea(list) {
+  const done = list.filter((t) => t.done && t.created_at && t.done_at);
+  const groups = new Map();
+  done.forEach((t) => {
+    const label = t.area ? t.area.trim() : "Sem área";
+    const key = label.toLowerCase();
+    const dias = daysBetween(t.created_at, t.done_at);
+    if (dias === null) return;
+    if (!groups.has(key)) groups.set(key, { label: label, total: 0, count: 0 });
+    const g = groups.get(key);
+    g.total += dias; g.count += 1;
+  });
+  return Array.from(groups.values())
+    .map((g) => ({ label: g.label, avg: g.total / g.count, count: g.count }))
+    .sort((a, b) => b.avg - a.avg);
+}
+function slaTableHtml(list) {
+  const rows = slaByArea(list);
+  if (!rows.length) return "";
+  const trs = rows.map((r) => "<tr><td>" + esc(r.label) + "</td><td>" + r.avg.toFixed(1) + "d</td><td>" + r.count + "</td></tr>").join("");
+  return '<p class="method-kicker">Média de dias até concluir, por área</p>' +
+    '<div class="history-table-wrap"><table class="history-table"><thead><tr><th>Área</th><th>Média</th><th>Qtd</th></tr></thead><tbody>' + trs + "</tbody></table></div>";
+}
 function historyHtml(list) {
   const done = list.filter((t) => t.done).slice()
     .sort((a, b) => (b.done_at || b.created_at || "").localeCompare(a.done_at || a.created_at || ""));
-  if (!done.length) return '<p class="empty-note">nada concluído ainda</p>';
-  const rows = done.map((t) => {
+  if (!done.length) return slaTableHtml(list) + '<p class="empty-note">nada concluído ainda</p>';
+  const expanded = !!expandedCols.__history__;
+  const visible = expanded ? done : done.slice(0, HISTORY_LIMIT);
+  const hidden = done.length - visible.length;
+  const rows = visible.map((t) => {
     const dias = daysBetween(t.created_at, t.done_at);
     return "<tr><td>" + esc(t.text) + (t.area ? ' <span class="tag-area">' + esc(t.area) + "</span>" : "") + "</td>" +
       "<td>" + fmtShortDate(t.created_at) + "</td>" +
       "<td>" + fmtShortDate(t.done_at) + "</td>" +
       "<td>" + (dias === null ? "—" : dias + "d") + "</td></tr>";
   }).join("");
-  return '<div class="history-table-wrap"><table class="history-table"><thead><tr><th>Tarefa</th><th>Criada</th><th>Concluída</th><th>Duração</th></tr></thead><tbody>' + rows + "</tbody></table></div>";
+  let html = slaTableHtml(list) +
+    '<p class="method-kicker">Linha a linha</p>' +
+    '<div class="history-table-wrap"><table class="history-table"><thead><tr><th>Tarefa</th><th>Criada</th><th>Concluída</th><th>Duração</th></tr></thead><tbody>' + rows + "</tbody></table></div>";
+  if (hidden > 0) html += '<button class="clearbtn" data-more="__history__">ver mais (' + hidden + ")</button>";
+  else if (expanded && done.length > HISTORY_LIMIT) html += '<button class="clearbtn" data-less="__history__">ver menos</button>';
+  return html;
 }
 
 /* ---------- CAPTURA INTELIGENTE ----------
@@ -511,6 +552,7 @@ function renderApp() {
     '<header class="top"><h1>' + LOGO + 'Meu dia <span>· organizador</span></h1>' +
     '<div class="who">' + esc(userEmail) + '<button id="out">sair</button></div></header>' +
     '<div class="date">' + new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" }) + "</div>" +
+    todaySummaryHtml() +
     '<div class="capture"><input id="capInput" placeholder="Anota qualquer coisa que chegou… (Enter pra capturar)" autocomplete="off" />' +
     '<button id="capBtn">' + icon('plus', 15) + ' Capturar</button></div>' +
     '<p class="hint">Capturar não é decidir. Joga tudo aqui primeiro e organiza depois. ' +
@@ -579,9 +621,9 @@ function renderApp() {
       html += "</span>";
       html += '<span class="chev" data-open="' + t.id + '">' + icon('chevron', 14) + '</span>';
       html += '<button class="x" data-del="' + t.id + '" title="remover">' + icon('close', 13) + '</button></div><div class="move">';
-      html += '<div class="move-chips">';
-      CHIPS.filter((c) => c.b !== b.id).forEach((c) => { html += '<button class="chip ' + c.cls + '" data-move="' + t.id + '" data-to="' + c.b + '">→ ' + c.label + "</button>"; });
-      html += '</div><div class="meta-row">';
+      html += '<select class="move-select" data-moveto="' + t.id + '"><option value="">mover para…</option>';
+      CHIPS.filter((c) => c.b !== b.id).forEach((c) => { html += '<option value="' + c.b + '">' + c.label + "</option>"; });
+      html += '</select><div class="meta-row">';
       html += '<input type="text" class="meta-text" data-text="' + t.id + '" value="' + esc(t.text) + '" placeholder="texto da tarefa" />';
       html += '<input type="text" data-area="' + t.id + '" list="areaList" placeholder="área" value="' + esc(t.area || "") + '" />';
       html += '<input type="date" data-due="' + t.id + '" value="' + (t.due_date || "") + '" />';
@@ -688,6 +730,7 @@ root.addEventListener("click", (e) => {
 root.addEventListener("change", (e) => {
   if (e.target.dataset.toggle) toggleTask(e.target.dataset.toggle, e.target.checked);
   else if (e.target.dataset.due) updateDue(e.target.dataset.due, e.target.value);
+  else if (e.target.dataset.moveto) { if (e.target.value) moveTask(e.target.dataset.moveto, e.target.value); }
   else if (e.target.dataset.farea !== undefined) { filters.area = e.target.value; renderApp(); }
 });
 root.addEventListener("focusout", (e) => {
