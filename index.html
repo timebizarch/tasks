@@ -306,11 +306,12 @@ function historyHtml(list) {
     return "<tr><td>" + esc(t.text) + (t.area ? ' <span class="tag-area">' + esc(t.area) + "</span>" : "") + "</td>" +
       "<td>" + fmtShortDate(t.created_at) + "</td>" +
       "<td>" + fmtShortDate(t.done_at) + "</td>" +
-      "<td>" + (dias === null ? "—" : dias + "d") + "</td></tr>";
+      "<td>" + (dias === null ? "—" : dias + "d") + "</td>" +
+      '<td><button class="x" data-del="' + t.id + '" title="remover do histórico">' + icon('close', 12) + "</button></td></tr>";
   }).join("");
   let html = slaTableHtml(list) +
     '<p class="method-kicker">Linha a linha</p>' +
-    '<div class="history-table-wrap"><table class="history-table"><thead><tr><th>Tarefa</th><th>Criada</th><th>Concluída</th><th>Duração</th></tr></thead><tbody>' + rows + "</tbody></table></div>";
+    '<div class="history-table-wrap"><table class="history-table"><thead><tr><th>Tarefa</th><th>Criada</th><th>Concluída</th><th>Duração</th><th></th></tr></thead><tbody>' + rows + "</tbody></table></div>";
   if (hidden > 0) html += '<button class="clearbtn" data-more="__history__">ver mais (' + hidden + ")</button>";
   else if (expanded && done.length > HISTORY_LIMIT) html += '<button class="clearbtn" data-less="__history__">ver menos</button>';
   return html;
