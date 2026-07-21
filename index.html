@@ -134,10 +134,12 @@
   .method-body li { margin-bottom: 5px; }
   .method-rule { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
   .method-rule span { background: var(--later-bg); border-radius: var(--radius-sm); padding: 6px 12px; font-size: 12.5px; }
-  .history-day { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; color: var(--muted-2); margin: 14px 0 6px !important; }
-  .history-day:first-child { margin-top: 2px !important; }
-  .history-item { font-size: 13px; color: var(--muted); padding: 4px 0; border-top: 1px solid var(--line); }
-  .history-item:first-of-type { border-top: none; }
+  .history-table-wrap { overflow-x: auto; }
+  .history-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .history-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted-2); font-weight: 700; padding: 0 10px 8px 0; border-bottom: 1px solid var(--line); }
+  .history-table td { padding: 7px 10px 7px 0; border-bottom: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+  .history-table td:first-child { color: var(--ink); white-space: normal; }
+  .history-table tr:last-child td { border-bottom: none; }
 
   .auth-wrap { display: grid; grid-template-columns: 1.05fr 1fr; min-height: 560px; border-radius: var(--radius-xl); overflow: hidden; box-shadow: var(--shadow-lg); background: var(--card); margin-top: 16px; }
   @media (max-width: 760px) { .auth-wrap { grid-template-columns: 1fr; min-height: auto; margin-top: 0; } }
@@ -237,22 +239,29 @@ function dueStatus(iso) {
   return "";
 }
 function fmtDue(iso) { const [, m, d] = iso.split("-"); return d + "/" + m; }
-function fmtHistoryDay(iso) {
-  if (!iso) return "sem data";
-  const d = new Date(iso + "T00:00:00");
-  return d.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
+function fmtShortDate(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso.slice(0, 10) + "T00:00:00");
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" });
+}
+function daysBetween(isoA, isoB) {
+  if (!isoA || !isoB) return null;
+  const a = new Date(isoA.slice(0, 10) + "T00:00:00");
+  const b = new Date(isoB.slice(0, 10) + "T00:00:00");
+  return Math.round((b - a) / 86400000);
 }
 function historyHtml(list) {
   const done = list.filter((t) => t.done).slice()
     .sort((a, b) => (b.done_at || b.created_at || "").localeCompare(a.done_at || a.created_at || ""));
   if (!done.length) return '<p class="empty-note">nada concluído ainda</p>';
-  let html = "", lastDay = null;
-  done.forEach((t) => {
-    const day = (t.done_at || t.created_at || "").slice(0, 10);
-    if (day !== lastDay) { html += '<p class="history-day">' + fmtHistoryDay(day) + "</p>"; lastDay = day; }
-    html += '<div class="history-item">' + esc(t.text) + (t.area ? ' <span class="tag-area">' + esc(t.area) + "</span>" : "") + "</div>";
-  });
-  return html;
+  const rows = done.map((t) => {
+    const dias = daysBetween(t.created_at, t.done_at);
+    return "<tr><td>" + esc(t.text) + (t.area ? ' <span class="tag-area">' + esc(t.area) + "</span>" : "") + "</td>" +
+      "<td>" + fmtShortDate(t.created_at) + "</td>" +
+      "<td>" + fmtShortDate(t.done_at) + "</td>" +
+      "<td>" + (dias === null ? "—" : dias + "d") + "</td></tr>";
+  }).join("");
+  return '<div class="history-table-wrap"><table class="history-table"><thead><tr><th>Tarefa</th><th>Criada</th><th>Concluída</th><th>Duração</th></tr></thead><tbody>' + rows + "</tbody></table></div>";
 }
 
 /* ---------- CAPTURA INTELIGENTE ----------
