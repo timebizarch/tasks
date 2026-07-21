@@ -4,6 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Meu dia · organizador Yuca</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%2312C68B'/%3E%3Ctext x='50' y='69' text-anchor='middle' font-family='Arial,sans-serif' font-size='58' font-weight='800' fill='white'%3EY%3C/text%3E%3C/svg%3E">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -173,10 +174,11 @@
   .setup code { background: var(--later-bg); padding: 2px 6px; border-radius: 5px; font-size: 13px; }
   .loading { color: var(--muted); font-size: 14px; padding: 60px 0; text-align: center; }
 
-  .confetti-bit { position: fixed; width: 7px; height: 7px; border-radius: 2px; pointer-events: none; z-index: 999;
-    animation: confetti-burst 750ms ease-out forwards; }
-  @keyframes confetti-burst {
+  .confetti-bit { position: fixed; pointer-events: none; z-index: 999;
+    animation-name: confetti-fall; animation-timing-function: linear; animation-fill-mode: forwards; }
+  @keyframes confetti-fall {
     0% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+    85% { opacity: 1; }
     100% { transform: translate(var(--dx), var(--dy)) rotate(var(--rot)); opacity: 0; }
   }
 </style>
@@ -370,33 +372,39 @@ const root = document.getElementById("root");
 const esc = (s) => (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 /* Comemoração ao concluir: sempre nas urgentes, ~1 em 3 nas normais
-   (reforço variável mantém o efeito surpresa em vez de cansar). */
-const CONFETTI_COLORS = ["#CE6363", "#07C1D6", "#7B17A2", "#12C68B"];
-function celebrate(x, y) {
-  const n = 14;
+   (reforço variável mantém o efeito surpresa em vez de cansar).
+   Chuva de confete ocupando a tela inteira, não só perto do checkbox. */
+const CONFETTI_COLORS = ["#CE6363", "#07C1D6", "#7B17A2", "#12C68B", "#8A5A05"];
+function celebrate() {
+  const n = 90;
+  const w = window.innerWidth, h = window.innerHeight;
   for (let i = 0; i < n; i++) {
     const p = document.createElement("div");
     p.className = "confetti-bit";
-    const angle = (Math.PI * 2 * i) / n + (i % 2 ? 0.15 : -0.15);
-    const dist = 40 + (i % 3) * 22;
-    const dx = Math.cos(angle) * dist;
-    const dy = Math.sin(angle) * dist - 30;
-    p.style.left = x + "px";
-    p.style.top = y + "px";
-    p.style.setProperty("--dx", dx + "px");
-    p.style.setProperty("--dy", dy + "px");
-    p.style.setProperty("--rot", Math.round(Math.random() * 360) + "deg");
+    const startX = Math.random() * w;
+    const drift = (Math.random() - 0.5) * 220;
+    const delay = Math.random() * 350;
+    const duration = 1500 + Math.random() * 1100;
+    const size = 6 + Math.round(Math.random() * 5);
+    p.style.left = startX + "px";
+    p.style.top = "-20px";
+    p.style.width = size + "px";
+    p.style.height = size + "px";
+    p.style.borderRadius = i % 2 ? "50%" : "2px";
+    p.style.setProperty("--dx", drift + "px");
+    p.style.setProperty("--dy", h + 40 + "px");
+    p.style.setProperty("--rot", Math.round(360 + Math.random() * 360) + "deg");
     p.style.background = CONFETTI_COLORS[i % CONFETTI_COLORS.length];
+    p.style.animationDelay = delay + "ms";
+    p.style.animationDuration = duration + "ms";
     document.body.appendChild(p);
-    setTimeout(() => p.remove(), 800);
+    setTimeout(() => p.remove(), delay + duration + 50);
   }
 }
-function maybeCelebrate(checkboxEl, task) {
+function maybeCelebrate(task) {
   if (!task) return;
   const shouldCelebrate = task.urgent || Math.random() < 1 / 3;
-  if (!shouldCelebrate) return;
-  const r = checkboxEl.getBoundingClientRect();
-  celebrate(r.left + r.width / 2, r.top + r.height / 2);
+  if (shouldCelebrate) celebrate();
 }
 let sb = null, tasks = [], userEmail = "";
 const COL_LIMIT = 6;
@@ -595,12 +603,23 @@ function renderApp() {
     '<p class="hint">Capturar não é decidir. Joga tudo aqui primeiro e organiza depois. ' +
     'Dica: "tarefa | área | até terça" ou "tarefa, urgente, até sexta" já preenchem área/prazo/urgência.</p>';
 
+  const inboxExpanded = !!expandedCols.__inbox__;
+  const inboxVisible = inboxExpanded ? inbox : inbox.slice(0, COL_LIMIT);
+  const inboxHidden = inbox.length - inboxVisible.length;
   html += '<div class="inbox' + (inbox.length ? "" : " empty") + '"><h2>' + icon('later', 13) + ' Caixa de captura (' + inbox.length + ")</h2>";
-  inbox.forEach((t) => {
-    html += '<div class="inbox-item"><span class="txt">' + esc(t.text) + '</span><span class="chips">';
+  inboxVisible.forEach((t) => {
+    const due = t.due_date ? dueStatus(t.due_date) : "";
+    html += '<div class="inbox-item"><span class="txt">';
+    if (t.urgent) html += '<span class="tag-urgent" title="urgente">' + icon('flame', 14) + '</span>';
+    html += esc(t.text);
+    if (t.area) html += '<span class="tag-area">' + esc(t.area) + '</span>';
+    if (t.due_date) html += '<span class="tag-due' + (due ? " tag-due-" + due : "") + '">' + fmtDue(t.due_date) + '</span>';
+    html += '</span><span class="chips">';
     CHIPS.forEach((c) => { html += '<button class="chip ' + c.cls + '" data-move="' + t.id + '" data-to="' + c.b + '">' + c.label + "</button>"; });
     html += '</span><button class="x" data-del="' + t.id + '" title="descartar">' + icon('close', 13) + '</button></div>';
   });
+  if (inboxHidden > 0) html += '<button class="clearbtn" data-more="__inbox__">ver mais (' + inboxHidden + ')</button>';
+  else if (inboxExpanded && inbox.length > COL_LIMIT) html += '<button class="clearbtn" data-less="__inbox__">ver menos</button>';
   html += "</div>";
 
   const filterOn = filters.urgent || filters.overdue || filters.area;
@@ -768,7 +787,7 @@ root.addEventListener("change", (e) => {
   if (e.target.dataset.toggle) {
     const id = e.target.dataset.toggle;
     const checked = e.target.checked;
-    if (checked) maybeCelebrate(e.target, tasks.find((x) => x.id === id));
+    if (checked) maybeCelebrate(tasks.find((x) => x.id === id));
     toggleTask(id, checked);
   }
   else if (e.target.dataset.due) updateDue(e.target.dataset.due, e.target.value);
