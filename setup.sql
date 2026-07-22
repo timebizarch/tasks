@@ -80,9 +80,8 @@ as $$
   join share_tokens s on s.user_id = t.user_id
   where s.token = p_token
     and s.revoked = false
-    and t.cleared_at is null
     and (
-      (t.done = false and t.bucket in ('hoje', 'semana', 'aguardando'))
+      (t.done = false and t.cleared_at is null and t.bucket in ('hoje', 'semana', 'aguardando'))
       or (t.done = true and t.done_at >= now() - interval '7 days')
     )
 $$;
