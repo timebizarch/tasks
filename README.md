@@ -35,6 +35,7 @@ Separar três coisas que hoje se misturam: capturar, priorizar, executar.
 ## Arquivos
 
 - `index.html` — o app inteiro (UI + auth + CRUD Supabase). As chaves ficam em duas constantes no topo do script (`SUPABASE_URL`, `SUPABASE_ANON_KEY`), com placeholders. Se não configuradas, o app mostra uma tela de "falta configurar".
+- `view.html` — visão somente-leitura pra compartilhar (ver v2.7 abaixo). Arquivo separado de propósito: zero risco de misturar código autenticado com público.
 - `setup.sql` — cria a tabela `tasks` e liga o RLS. Rodar uma vez no SQL Editor do Supabase.
 - `README.md` — este arquivo.
 
@@ -51,6 +52,8 @@ Tabela `tasks`: `id` (uuid), `user_id` (uuid, default `auth.uid()`, FK pra `auth
 **v2.3 — auto-promoção e histórico:** tarefa de Esta semana/Aguardando/Depois com `due_date` vencendo hoje ou no passado sobe sozinha pra Hoje ao carregar o app (avisa com um banner). "Limpar concluídas" não apaga mais — só marca `cleared_at` e some da coluna; um painel "Histórico de concluídas" no rodapé mostra tudo que já foi feito, agrupado por dia.
 
 **v2.5 — subtarefas ("próximos passos"):** tarefa pode ter `parent_id` apontando pra outra tarefa — um nível só de aninhamento (uma subtask não pode ter subtask). Cada passo é uma tarefa normal (tem seu próprio balde/área/prazo/urgência, entra em busca/filtro/promoção automática/histórico igual a qualquer outra). No painel de uma tarefa-mãe, um campo "+ adicionar próximo passo" cria o passo direto na `inbox` (capturar não é decidir, vale pra passos também), e uma mini-checklist mostra o progresso ("N/M passos"). Cada passo também aparece como card independente no balde em que estiver, com uma tag "↳ de: ..." apontando pra mãe. Concluir todos os passos **não** fecha a mãe automaticamente — quem decide isso é a Giovanna. Apagar a mãe apaga os passos junto (`on delete cascade`), com aviso específico antes de confirmar.
+
+**v2.7 — visão compartilhada somente-leitura:** um painel "Compartilhar visão" no `index.html` gera um link público (`view.html?t=<token>`) que mostra Hoje/Esta semana/Aguardando + concluídas nos últimos 7 dias, sem exigir login de quem recebe. Arquitetura: tabela `share_tokens` (um token por vez, revogável) + duas funções Postgres `security definer` (`get_shared_tasks`, `is_valid_share_token`) que ignoram o RLS normal só pra essa consulta específica e controlada — nunca expõem a tabela `tasks` inteira. Fora dos baldes citados, nada mais é visível (a Caixa de captura fica de fora de propósito: é pré-triagem, não faz sentido virar público). Segurança é "quem tem o link, vê" (como um link do Trello), não uma conta de verdade — por isso dá pra revogar a qualquer momento e gerar um novo.
 
 ## Setup pendente (não feito ainda)
 

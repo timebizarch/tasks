@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Visão compartilhada · Meu dia Yuca</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%2312C68B'/%3E%3Ctext x='50' y='69' text-anchor='middle' font-family='Arial,sans-serif' font-size='58' font-weight='800' fill='white'%3EY%3C/text%3E%3C/svg%3E">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700;9..144,900&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #FDFAF7; --card: #FFFFFF; --ink: #062840; --muted: #425158; --muted-2: #5B6570;
+    --line: #DDE1E3; --line-strong: #BBC3C7; --done: #13C081;
+    --accent: #12C68B; --accent-dark: #098C7B; --accent-lighten: #F2FBF7;
+    --today: #CE6363; --today-bg: #FEF5F5;
+    --week: #07C1D6; --week-bg: #EEF7FB;
+    --wait: #7B17A2; --wait-bg: #FDFAFF;
+    --later: #8E9BA1; --later-bg: #F4F5F6;
+    --error: #B8265A; --error-bg: #FDF4F4;
+    --alert: #8A5A05; --alert-bg: #FFFAF1;
+    --overdue: #B23A0E; --overdue-bg: #FDF1EA;
+    --radius-sm: 8px; --radius-md: 12px; --radius-lg: 16px; --radius-pill: 999px;
+    --shadow-sm: 0 2px 6px rgba(16,36,54,.06), 0 1px 2px rgba(16,36,54,.04);
+    --font-display: 'Fraunces', Georgia, serif;
+    --font-body: 'Montserrat', system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--font-body); line-height: 1.45; }
+  .wrap { max-width: 1140px; margin: 0 auto; padding: 28px 20px 60px; }
+  header.top { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 6px; }
+  h1 { font-family: var(--font-display); font-size: 22px; font-weight: 700; letter-spacing: -0.01em; margin: 0; display: flex; align-items: center; gap: 9px; }
+  h1 span { color: var(--muted); font-weight: 500; font-size: 0.75em; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 22px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .refresh-btn { border: 1px solid var(--line); background: var(--card); color: var(--muted); font-size: 12px; padding: 5px 12px; border-radius: var(--radius-pill); cursor: pointer; font-family: var(--font-body); }
+  .refresh-btn:hover { border-color: var(--accent); color: var(--accent-dark); }
+  .note { background: var(--accent-lighten); border: 1px solid var(--accent); color: var(--accent-dark); border-radius: var(--radius-md); font-size: 12.5px; padding: 8px 14px; margin: 0 0 20px; }
+
+  .board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+  @media (max-width: 760px) { .board { grid-template-columns: 1fr; } }
+  .col { background: var(--card); border: 1.5px solid var(--line); border-radius: var(--radius-lg); padding: 14px; min-height: 80px; min-width: 0; box-shadow: var(--shadow-sm); }
+  .col-head { display: flex; align-items: center; gap: 6px; margin-bottom: 12px; }
+  .col-title { font-size: 13.5px; font-weight: 700; }
+  .col-sub { font-size: 11px; color: var(--muted); margin-left: auto; }
+  .col[data-b="hoje"] { border-top: 3px solid var(--today); }
+  .col[data-b="semana"] { border-top: 3px solid var(--week); }
+  .col[data-b="aguardando"] { border-top: 3px solid var(--wait); }
+  .empty-note { color: var(--muted-2); font-size: 12.5px; font-style: italic; padding: 4px 0; }
+
+  .task { border-top: 1px solid var(--line); padding: 9px 0; font-size: 14px; }
+  .task:first-of-type { border-top: none; }
+  .tag-urgent { color: var(--error); margin-right: 3px; }
+  .tag-area, .tag-due, .tag-wait { font-size: 11px; padding: 2px 8px; border-radius: var(--radius-pill); margin-left: 6px; background: var(--later-bg); color: var(--muted); white-space: nowrap; }
+  .tag-due-today { background: var(--alert-bg); color: var(--alert); font-weight: 600; }
+  .tag-due-overdue { background: var(--overdue-bg); color: var(--overdue); font-weight: 700; }
+  .tag-wait { background: var(--wait-bg); color: var(--wait); font-weight: 600; }
+
+  .done-section { background: var(--card); border: 1.5px dashed var(--line-strong); border-radius: var(--radius-lg); padding: 14px 16px; }
+  .done-section h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 10px; font-weight: 700; }
+  .done-item { padding: 6px 0; border-top: 1px solid var(--line); font-size: 14px; color: var(--muted-2); text-decoration: line-through; }
+  .done-item:first-of-type { border-top: none; }
+
+  .loading, .err { color: var(--muted); font-size: 14px; padding: 60px 0; text-align: center; }
+  .err { color: var(--error); }
+</style>
+</head>
+<body>
+<div class="wrap" id="root"><div class="loading">Carregando…</div></div>
+<script>
+const SUPABASE_URL = "https://aaqshcyuxmeatpilcmgp.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_uD-_uFrzj10uTSxrQm4TZA_ezJEgkf-";
+const root = document.getElementById("root");
+const esc = (s) => (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function dueStatus(iso) {
+  if (!iso) return "";
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const d = new Date(iso + "T00:00:00");
+  if (d < today) return "overdue";
+  if (d.getTime() === today.getTime()) return "today";
+  return "";
+}
+function fmtDue(iso) { const [, m, d] = iso.split("-"); return d + "/" + m; }
+function fmtShortDate(iso) {
+  const d = new Date(iso.slice(0, 10) + "T00:00:00");
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+}
+function taskHtml(t) {
+  const due = t.due_date ? dueStatus(t.due_date) : "";
+  let html = '<div class="task">';
+  if (t.urgent) html += '<span class="tag-urgent">🔥</span>';
+  html += esc(t.text);
+  if (t.area) html += '<span class="tag-area">' + esc(t.area) + "</span>";
+  if (t.due_date) html += '<span class="tag-due' + (due ? " tag-due-" + due : "") + '">' + fmtDue(t.due_date) + "</span>";
+  if (t.waiting_on) html += '<span class="tag-wait">aguardando: ' + esc(t.waiting_on) + "</span>";
+  html += "</div>";
+  return html;
+}
+function render(tasks, ownerLabel) {
+  const BUCKETS = [
+    { id: "hoje", title: "Hoje", sub: "foco de hoje" },
+    { id: "semana", title: "Esta semana", sub: "complexas" },
+    { id: "aguardando", title: "Aguardando", sub: "depende de alguém" },
+  ];
+  const done = tasks.filter((t) => t.done).sort((a, b) => (b.done_at || "").localeCompare(a.done_at || ""));
+  let html = '<header class="top"><h1>Meu dia <span>· visão compartilhada</span></h1></header>' +
+    '<div class="sub">' + (ownerLabel ? esc(ownerLabel) + " — " : "") + "atualizado agora" +
+    '<button class="refresh-btn" id="refreshBtn">atualizar</button></div>' +
+    '<div class="note">Visão somente-leitura: Hoje, Esta semana, Aguardando e concluídas nos últimos 7 dias. Nada aqui pode ser editado.</div>' +
+    '<div class="board">';
+  BUCKETS.forEach((b) => {
+    const items = tasks.filter((t) => t.bucket === b.id && !t.done);
+    html += '<div class="col" data-b="' + b.id + '"><div class="col-head"><span class="col-title">' + b.title + '</span><span class="col-sub">' + items.length + " · " + b.sub + "</span></div>";
+    if (!items.length) html += '<div class="empty-note">vazio</div>';
+    items.forEach((t) => { html += taskHtml(t); });
+    html += "</div>";
+  });
+  html += "</div>";
+  html += '<div class="done-section"><h2>Concluídas nos últimos 7 dias (' + done.length + ")</h2>";
+  if (!done.length) html += '<div class="empty-note">nada concluído nesse período</div>';
+  done.forEach((t) => { html += '<div class="done-item">' + esc(t.text) + (t.done_at ? " — " + fmtShortDate(t.done_at) : "") + "</div>"; });
+  html += "</div>";
+  root.innerHTML = html;
+  document.getElementById("refreshBtn").onclick = load;
+}
+let cachedToken = null;
+async function load() {
+  root.innerHTML = '<div class="loading">Carregando…</div>';
+  const params = new URLSearchParams(location.search);
+  const token = cachedToken || params.get("t");
+  if (!token) { root.innerHTML = '<div class="err">Link inválido — falta o parâmetro de acesso.</div>'; return; }
+  cachedToken = token;
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const { data: valid, error: validError } = await sb.rpc("is_valid_share_token", { p_token: token });
+  if (validError) { root.innerHTML = '<div class="err">Não deu pra carregar: ' + esc(validError.message) + "</div>"; return; }
+  if (!valid) { root.innerHTML = '<div class="err">Esse link foi revogado ou não existe mais. Peça um link novo.</div>'; return; }
+  const { data, error } = await sb.rpc("get_shared_tasks", { p_token: token });
+  if (error) { root.innerHTML = '<div class="err">Não deu pra carregar: ' + esc(error.message) + "</div>"; return; }
+  render(data || [], null);
+}
+load();
+</script>
+</body>
+</html>

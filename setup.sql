@@ -41,3 +41,63 @@ alter table tasks add column if not exists source text;
 -- com parent_id apontando pra outra tarefa — um nível só de aninhamento.
 -- Apagar a tarefa-mãe apaga os passos junto (on delete cascade).
 alter table tasks add column if not exists parent_id uuid references tasks(id) on delete cascade;
+
+-- v2.6: sincronização Slack ⇄ conclusão. Guarda em qual canal/mensagem
+-- a tarefa nasceu no Slack, pra depois marcar ✅ lá quando for concluída
+-- (e vice-versa: reação ✅ no Slack marca done aqui). Preenchido só pela
+-- automação do Make; captura manual pelo app deixa null.
+alter table tasks add column if not exists slack_channel text;
+alter table tasks add column if not exists slack_ts text;
+
+-- v2.7: link de visualização somente-leitura, pra compartilhar com o líder
+-- sem dar login. Quem tem o token vê Hoje/Esta semana/Aguardando + o que
+-- foi concluído nos últimos 7 dias, via a função abaixo — nunca a tabela
+-- direto (o RLS normal continua exigindo login pra qualquer outro acesso).
+create table if not exists share_tokens (
+  token       uuid primary key default gen_random_uuid(),
+  user_id     uuid not null default auth.uid() references auth.users on delete cascade,
+  created_at  timestamptz not null default now(),
+  revoked     boolean not null default false
+);
+
+alter table share_tokens enable row level security;
+
+create policy "cada um vê e mexe só nos próprios links de compartilhamento"
+  on share_tokens for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- security definer: roda ignorando o RLS de "tasks" acima, mas só devolve
+-- o que a própria função decide expor — nunca a tabela inteira.
+create or replace function get_shared_tasks(p_token uuid)
+returns setof tasks
+language sql
+security definer
+set search_path = public
+as $$
+  select t.*
+  from tasks t
+  join share_tokens s on s.user_id = t.user_id
+  where s.token = p_token
+    and s.revoked = false
+    and t.cleared_at is null
+    and (
+      (t.done = false and t.bucket in ('hoje', 'semana', 'aguardando'))
+      or (t.done = true and t.done_at >= now() - interval '7 days')
+    )
+$$;
+
+grant execute on function get_shared_tasks(uuid) to anon;
+
+-- checagem separada de validade: sem isso, um link revogado e um dia sem
+-- nenhuma tarefa ficam indistinguíveis (os dois retornam lista vazia).
+create or replace function is_valid_share_token(p_token uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select exists(select 1 from share_tokens where token = p_token and revoked = false);
+$$;
+
+grant execute on function is_valid_share_token(uuid) to anon;

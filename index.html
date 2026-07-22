@@ -54,10 +54,10 @@
   .inbox { background: var(--card); border: 1.5px dashed var(--line-strong); border-radius: var(--radius-lg); padding: 14px 16px; margin-bottom: 22px; }
   .inbox.empty { display: none; }
   .inbox h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 10px; font-weight: 700; }
-  .inbox-item { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-top: 1px solid var(--line); }
+  .inbox-item { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 7px 0; border-top: 1px solid var(--line); }
   .inbox-item:first-of-type { border-top: none; }
-  .inbox-item .txt { flex: 1; min-width: 0; font-size: 14.5px; }
-  .chips { display: flex; gap: 5px; flex-wrap: wrap; }
+  .inbox-item .txt { flex: 1 1 170px; min-width: 170px; font-size: 14.5px; }
+  .chips { display: flex; gap: 5px; flex-wrap: wrap; flex: 0 0 auto; }
   .chip { border: 1px solid var(--line); background: var(--paper); border-radius: var(--radius-pill); font-size: 11.5px; padding: 4px 10px; cursor: pointer; color: var(--ink); white-space: nowrap; font-family: var(--font-body); }
   .chip:hover { border-color: var(--ink); }
   .chip.c-today:hover { background: var(--today-bg); border-color: var(--today); }
@@ -102,7 +102,7 @@
   .task:first-of-type { border-top: none; }
   .task-row { display: flex; align-items: center; gap: 9px; }
   .cb { width: 20px; height: 20px; cursor: pointer; accent-color: var(--done); flex: none; }
-  .task .txt { flex: 1; min-width: 0; font-size: 14px; cursor: pointer; }
+  .task .txt { flex: 1 1 60px; min-width: 60px; font-size: 14px; cursor: pointer; }
   .task.done .txt { text-decoration: line-through; color: var(--muted-2); }
   .task .move { display: none; flex-direction: column; gap: 8px; margin: 8px 0 2px 25px; }
   .task.open .move { display: flex; }
@@ -122,12 +122,12 @@
   .limit-banner { background: var(--today-bg); color: var(--today); border-radius: var(--radius-sm); font-size: 11.5px; font-weight: 600; padding: 6px 9px; margin-bottom: 10px; }
   .filter-banner { background: var(--accent-lighten); border: 1px solid var(--accent); color: var(--accent-dark); border-radius: var(--radius-md); font-size: 12.5px; font-weight: 600; padding: 8px 14px; margin: 0 0 12px; }
 
-  .meta-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
-  .meta-row input { font-size: 12.5px; padding: 6px 9px; border: 1px solid var(--line); border-radius: var(--radius-sm); font-family: var(--font-body); background: var(--card); color: var(--ink); outline: none; }
-  .meta-row input[data-area], .meta-row input[data-waiting] { width: 120px; }
-  .meta-row input.meta-text { flex: 1 1 100%; }
-  .meta-row input:focus { border-color: var(--accent); box-shadow: var(--shadow-focus); }
-  .meta-urgent-btn { font-size: 12px; border: 1px solid var(--line); background: var(--card); border-radius: var(--radius-pill); padding: 5px 11px; cursor: pointer; font-family: var(--font-body); color: var(--muted); }
+  .meta-text { display: block; width: 100%; box-sizing: border-box; font-size: 13.5px; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); font-family: var(--font-body); background: var(--card); color: var(--ink); outline: none; }
+  .meta-text:focus { border-color: var(--accent); box-shadow: var(--shadow-focus); }
+  .meta-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 6px; }
+  .meta-grid input, .meta-grid .meta-urgent-btn { width: 100%; min-width: 0; box-sizing: border-box; font-size: 12.5px; padding: 6px 9px; border: 1px solid var(--line); border-radius: var(--radius-sm); font-family: var(--font-body); background: var(--card); color: var(--ink); outline: none; }
+  .meta-grid input:focus { border-color: var(--accent); box-shadow: var(--shadow-focus); }
+  .meta-urgent-btn { border-radius: var(--radius-pill) !important; cursor: pointer; color: var(--muted); text-align: center; }
   .meta-urgent-btn.on { background: var(--error-bg); border-color: var(--error); color: var(--error); font-weight: 700; }
   .clearbtn { margin-top: 8px; border: none; background: none; color: var(--muted); font-size: 12px; cursor: pointer; padding: 2px 0; font-family: var(--font-body); }
   .clearbtn:hover { color: var(--done); }
@@ -161,6 +161,8 @@
   .history-table td { padding: 7px 10px 7px 0; border-bottom: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
   .history-table td:first-child { color: var(--ink); white-space: normal; }
   .history-table tr:last-child td { border-bottom: none; }
+  .share-link-row { display: flex; gap: 8px; margin: 10px 0 8px; }
+  .share-link-input { flex: 1; min-width: 0; font-size: 12.5px; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); font-family: var(--font-body); background: var(--later-bg); color: var(--muted); }
 
   .auth-wrap { display: grid; grid-template-columns: 1.05fr 1fr; min-height: 560px; border-radius: var(--radius-xl); overflow: hidden; box-shadow: var(--shadow-lg); background: var(--card); margin-top: 16px; }
   @media (max-width: 760px) { .auth-wrap { grid-template-columns: 1fr; min-height: auto; margin-top: 0; } }
@@ -491,6 +493,9 @@ let methodOpen = null; // null = ainda não decidido nesta sessão
 let searchQuery = "";
 let refocusSearch = false;
 let refocusSubtask = null; // id da tarefa-mãe cujo campo "próximo passo" deve reganhar foco
+let shareToken = null; // token ativo de compartilhamento (visão só-leitura), se houver
+let shareOpen = false; // painel "Compartilhar visão" expandido? precisa sobreviver a re-renders
+let historyOpen = false; // painel "Histórico de concluídas" expandido? precisa sobreviver a re-renders
 
 function boot() {
   if (SUPABASE_URL.startsWith("COLE_") || SUPABASE_ANON_KEY.startsWith("COLE_")) {
@@ -604,7 +609,23 @@ async function loadAndRender(quiet) {
   if (error) { root.innerHTML = '<div class="loading">Erro ao carregar: ' + esc(error.message) + "</div>"; return; }
   tasks = data || [];
   await autoPromoteOverdue();
+  await loadShareToken();
   renderApp();
+}
+async function loadShareToken() {
+  // Tabela pode não existir ainda (se a v2.7 do setup.sql não rodou) — falha calada, feature só some.
+  const { data, error } = await sb.from("share_tokens").select("token").eq("revoked", false).order("created_at", { ascending: false }).limit(1);
+  shareToken = !error && data && data[0] ? data[0].token : null;
+}
+async function createShareLink() {
+  const { error } = await sb.from("share_tokens").insert({});
+  if (error) { reportError("gerar o link de visualização", error); return; }
+  loadAndRender(true);
+}
+async function revokeShareLink(token) {
+  const { error } = await sb.from("share_tokens").update({ revoked: true }).eq("token", token);
+  if (error) { reportError("revogar o link de visualização", error); return; }
+  loadAndRender(true);
 }
 async function addTask(raw) {
   const p = smartParse(raw);
@@ -818,8 +839,9 @@ function renderApp() {
       html += '<button class="x" data-del="' + t.id + '" title="remover">' + icon('close', 13) + '</button></div><div class="move">';
       html += '<select class="move-select" data-moveto="' + t.id + '"><option value="">mover para…</option>';
       CHIPS.filter((c) => c.b !== b.id).forEach((c) => { html += '<option value="' + c.b + '">' + c.label + "</option>"; });
-      html += '</select><div class="meta-row">';
+      html += '</select>';
       html += '<input type="text" class="meta-text" data-text="' + t.id + '" value="' + esc(t.text) + '" placeholder="texto da tarefa" />';
+      html += '<div class="meta-grid">';
       html += '<input type="text" data-area="' + t.id + '" list="areaList" placeholder="área" value="' + esc(t.area || "") + '" />';
       html += '<input type="date" data-due="' + t.id + '" value="' + (t.due_date || "") + '" />';
       html += '<button class="meta-urgent-btn' + (t.urgent ? " on" : "") + '" data-urgent="' + t.id + '">' + icon('flame', 13) + ' urgente</button>';
@@ -837,16 +859,29 @@ function renderApp() {
 
   const doneCount = tasks.filter((t) => t.done).length;
   html +=
-    '<details class="method"><summary>Histórico de concluídas (' + doneCount + ")</summary><div class=\"method-body\">" +
+    '<details class="method" id="historyDetails"' + (historyOpen ? " open" : "") + '><summary>Histórico de concluídas (' + doneCount + ")</summary><div class=\"method-body\">" +
     historyHtml(tasks) +
     "</div></details>";
+
+  html += '<details class="method" id="shareDetails"' + (shareOpen ? " open" : "") + '><summary>Compartilhar visão (só leitura)</summary><div class="method-body">' +
+    "<p>Gera um link somente-leitura pra alguém acompanhar Hoje, Esta semana, Aguardando e o que você concluiu nos últimos 7 dias — sem precisar de login. Ninguém edita nada por ali.</p>";
+  if (shareToken) {
+    const dir = location.pathname.slice(0, location.pathname.lastIndexOf("/") + 1);
+    const shareLink = location.origin + dir + "view.html?t=" + shareToken;
+    html += '<div class="share-link-row"><input type="text" class="share-link-input" readonly value="' + esc(shareLink) + '" />' +
+      '<button class="clearbtn" data-copy-share="' + esc(shareLink) + '">copiar link</button></div>' +
+      '<button class="clearbtn" data-revoke-share="' + shareToken + '">revogar acesso</button>';
+  } else {
+    html += '<button class="primary" data-gen-share>Gerar link de visualização</button>';
+  }
+  html += "</div></details>";
 
   if (methodOpen === null) {
     methodOpen = !localStorage.getItem("yuca_method_seen");
     localStorage.setItem("yuca_method_seen", "1");
   }
   html +=
-    '<details class="method"' + (methodOpen ? " open" : "") + '><summary>Como usar (o método)</summary><div class="method-body">' +
+    '<details class="method" id="methodDetails"' + (methodOpen ? " open" : "") + '><summary>Como usar (o método)</summary><div class="method-body">' +
     '<p class="method-kicker">Todo dia (10 min)</p>' +
     "<ol>" +
       "<li>Esvazia a caixa de captura: decide o balde de cada item.</li>" +
@@ -910,7 +945,11 @@ function renderApp() {
     }
   }
 
-  const methodEl = document.querySelector("details.method");
+  const historyEl = document.getElementById("historyDetails");
+  if (historyEl) historyEl.addEventListener("toggle", () => { historyOpen = historyEl.open; });
+  const shareEl = document.getElementById("shareDetails");
+  if (shareEl) shareEl.addEventListener("toggle", () => { shareOpen = shareEl.open; });
+  const methodEl = document.getElementById("methodDetails");
   if (methodEl) methodEl.addEventListener("toggle", () => { methodOpen = methodEl.open; });
 
   if (refocusSubtask) {
@@ -943,6 +982,9 @@ root.addEventListener("click", (e) => {
   const openEl = e.target.closest("[data-open]");
   const ffilterBtn = e.target.closest("[data-ffilter]");
   const fclearBtn = e.target.closest("[data-fclear]");
+  const genShareBtn = e.target.closest("[data-gen-share]");
+  const revokeShareBtn = e.target.closest("[data-revoke-share]");
+  const copyShareBtn = e.target.closest("[data-copy-share]");
   if (moveBtn) moveTask(moveBtn.dataset.move, moveBtn.dataset.to);
   else if (delBtn) {
     const id = delBtn.dataset.del;
@@ -960,6 +1002,14 @@ root.addEventListener("click", (e) => {
   else if (ffilterBtn) { const k = ffilterBtn.dataset.ffilter; filters[k] = !filters[k]; renderApp(); }
   else if (fclearBtn) { filters = { urgent: false, overdue: false, area: "" }; renderApp(); }
   else if (openEl) { const id = openEl.dataset.open; openTasks[id] = !openTasks[id]; renderApp(); }
+  else if (genShareBtn) createShareLink();
+  else if (revokeShareBtn) { if (confirm("Revogar esse link? Quem tiver ele salvo deixa de conseguir ver suas tarefas.")) revokeShareLink(revokeShareBtn.dataset.revokeShare); }
+  else if (copyShareBtn) {
+    navigator.clipboard.writeText(copyShareBtn.dataset.copyShare).then(
+      () => showToast("Link copiado!"),
+      () => showToast("Não deu pra copiar — seleciona e copia manualmente.", true)
+    );
+  }
 });
 root.addEventListener("change", (e) => {
   if (e.target.dataset.toggle) {
